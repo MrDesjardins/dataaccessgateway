@@ -301,7 +301,6 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         });
     }
     public getMemoryStoreData<T>(id: string): CachedData<T> | undefined {
-        console.warn("IANSDIASNDAISNDASINDAISD");
         return this.cachedResponse.get(id);
     }
     public async getPersistentStoreData<T>(id: string): Promise<CacheDataWithId<T> | undefined> {
