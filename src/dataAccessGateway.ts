@@ -39,7 +39,7 @@ export interface DataAccessSingletonOptions {
  */
 export interface IDataAccessSingleton {
     setConfiguration(options?: Partial<DataAccessSingletonOptions>): void;
-    fetch<T>(request: AjaxRequest): Promise<DataResponse<T>>;
+    fetchFresh<T>(request: AjaxRequest): Promise<DataResponse<T>>;
     fetchFast<T>(request: AjaxRequest): Promise<DataResponse<T>>
 }
 
@@ -82,7 +82,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
      * wait the response to cache it and return it. It means that each time the data is obsolete that the fetch takes time but
      * subsequent request will be faster. This function focus on accuracy first.
      */
-    public fetch<T>(request: AjaxRequest): Promise<DataResponse<T>> {
+    public fetchFresh<T>(request: AjaxRequest): Promise<DataResponse<T>> {
         this.setDefaultRequestId(request); // Default values        
         this.setDefaultCache(request); // We enforce a minimum memory cache of few seconds
 

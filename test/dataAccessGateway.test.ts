@@ -298,7 +298,7 @@ describe("DataAccessSingleton", () => {
         });
     });
 
-    describe("fetch", () => {
+    describe("fetchFresh", () => {
         let request: AjaxRequest;
         beforeEach(() => {
             request = {
@@ -316,15 +316,15 @@ describe("DataAccessSingleton", () => {
             das.saveCache = jest.fn().mockResolvedValue(cacheDataNotExpired);
         });
         it("always call the default request id configuration", () => {
-            das.fetch(request);
+            das.fetchFresh(request);
             expect(das.setDefaultRequestId).toHaveBeenCalledTimes(1);
         });
         it("always call the default cache", () => {
-            das.fetch(request);
+            das.fetchFresh(request);
             expect(das.setDefaultCache).toHaveBeenCalledTimes(1);
         });
         it("always call memory cache", () => {
-            das.fetch(request);
+            das.fetchFresh(request);
             expect(das.tryMemoryCacheFetching).toHaveBeenCalledTimes(1);
         });
         describe("when value is in memory cache", () => {
@@ -333,11 +333,11 @@ describe("DataAccessSingleton", () => {
                 das.saveCache = jest.fn().mockResolvedValue(dataResponseFromCache);
             });
             it("returns memory cache", async () => {
-                const result = await das.fetch(request);
+                const result = await das.fetchFresh(request);
                 expect(result.result).toEqual(cacheDataNotExpired.payload);
             });
             it("always invoke saveCache", async () => {
-                await das.fetch(request);
+                await das.fetchFresh(request);
                 expect(das.saveCache).toHaveBeenCalledTimes(1);
             });
         });
@@ -347,7 +347,7 @@ describe("DataAccessSingleton", () => {
                 das.tryPersistentStorageFetching = jest.fn().mockResolvedValue(undefined);
             });
             it("returns call persistent storage", async () => {
-                await das.fetch(request);
+                await das.fetchFresh(request);
                 expect(das.tryPersistentStorageFetching).toHaveBeenCalledTimes(1);
             });
             describe("when value is NOT in persistent cache", () => {
@@ -355,7 +355,7 @@ describe("DataAccessSingleton", () => {
                     das.tryPersistentStorageFetching = jest.fn().mockResolvedValue(undefined);
                 });
                 it("calls Ajax HTTP request", async () => {
-                    await das.fetch(request);
+                    await das.fetchFresh(request);
                     expect(das.fetchWithAjax).toHaveBeenCalledTimes(1);
                 });
             });
@@ -364,7 +364,7 @@ describe("DataAccessSingleton", () => {
                     das.tryPersistentStorageFetching = jest.fn().mockResolvedValue(dataResponseFromCache);
                 });
                 it("calls save cache", async () => {
-                    await das.fetch(request);
+                    await das.fetchFresh(request);
                     expect(das.saveCache).toHaveBeenCalledTimes(1);
                 });
             });
