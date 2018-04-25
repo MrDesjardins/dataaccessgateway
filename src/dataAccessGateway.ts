@@ -27,7 +27,7 @@ export class DataAccessIndexDbDatabase extends Dexie {
 export interface DataAccessSingletonOptions {
     isCacheEnabled: boolean;
     isCacheMandatoryIfEnabled: boolean;
-    defaultLifeSpanInMinute: number;
+    defaultLifeSpanInSeconds: number;
     version: number;
     log: (error: any) => void;
 }
@@ -52,7 +52,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
     public DefaultOptions: Readonly<DataAccessSingletonOptions> = {
         isCacheEnabled: true,
         isCacheMandatoryIfEnabled: true,
-        defaultLifeSpanInMinute: 5 * 60,
+        defaultLifeSpanInSeconds: 5 * 60,
         version: 1,
         log: () => { /*Nothing*/ }
     };
@@ -178,13 +178,13 @@ export class DataAccessSingleton implements IDataAccessSingleton {
 
     public setDefaultCache(request: AjaxRequest): void {
         if (request.memoryCache === undefined && this.options.isCacheMandatoryIfEnabled) {
-            request.memoryCache = { lifespanInSeconds: this.options.defaultLifeSpanInMinute }; // Provide ALWAYS a minimum memory cache with small life
+            request.memoryCache = { lifespanInSeconds: this.options.defaultLifeSpanInSeconds }; // Provide ALWAYS a minimum memory cache with small life
         }
     }
     public setDefaultFastCache(request: AjaxRequest): void {
         this.setDefaultCache(request);
         if (request.persistentCache === undefined && this.options.isCacheMandatoryIfEnabled) {
-            request.persistentCache = { lifespanInSeconds: this.options.defaultLifeSpanInMinute }; // Provide ALWAYS a minimum memory cache with small life
+            request.persistentCache = { lifespanInSeconds: this.options.defaultLifeSpanInSeconds }; // Provide ALWAYS a minimum memory cache with small life
         }
     }
 

@@ -1,10 +1,13 @@
 {
   "name": "dataaccessgateway",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "description": "A simple library that cache in two different levels HTTP requests",
   "repository": {
     "type": "git",
     "url": "https://github.com/MrDesjardins/dataaccessgateway"
+  },
+  "bugs": {
+    "url": "https://github.com/MrDesjardins/dataaccessgateway/issues"
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
