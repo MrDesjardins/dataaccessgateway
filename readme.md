@@ -1,5 +1,9 @@
 # Data Access Gateway
 
+[![Build Status](https://travis-ci.org/MrDesjardins/dataaccessgateway.svg?branch=master)](https://travis-ci.org/MrDesjardins/dataaccessgateway)
+
+[![Coverage Status](https://coveralls.io/repos/github/MrDesjardins/dataaccessgateway/badge.svg?branch=master)](https://coveralls.io/github/MrDesjardins/dataaccessgateway?branch=master)
+
 The goal of this library is to provide a tiny abstraction to cache data from API calls easily without having to configure many options. It works with two levels of cache. The first one is a memory cache and the second use IndexDB as a persistent cache.
 
 There is two modes. The first one is called `fetchFresh` and will check the memory cache first, if not present, will fall into the persistent cache. If not present or out-of-date, it does the HTTP request and fill the caches. In the case of obsolete data, the fallback to the API request might take times and hence this function doesn't guarantee to be efficient when the life of the data is out. The second mode, `fastFetch` will return the data from any cache (memory first, then persistent cache second) if available regardless of the expiration. However, it will fetch in background and fill the caches giving the opportunity to subsequent calls to have fresh values.
