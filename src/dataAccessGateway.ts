@@ -293,4 +293,5 @@ export class DataAccessSingleton {
         return this.openIndexDb.data.delete(id);
     }
 }
-export const DataAccessGateway = DataAccessSingleton.getInstance();
+const DataAccessGateway = DataAccessSingleton.getInstance();
+export default DataAccessGateway;
