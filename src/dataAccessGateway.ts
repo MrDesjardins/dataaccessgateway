@@ -117,7 +117,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
     public fetchFast<T>(request: AjaxRequest): Promise<DataResponse<T>> {
         // If the flag is off, we skip and go directly to the Ajax
         if (!this.options.isCacheEnabled) {
-            return this.fetchAndSaveInCacheIfExpired<T>(request);
+            return this.fetchAndSaveInCacheIfExpired<T>(request, DataSource.HttpRequest);
         }
 
         this.setDefaultRequestId(request); // Default values        
@@ -129,11 +129,11 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             // Not in memory, check in long term storage
             return this.getPersistentStoreData(request.id!).then((persistentStorageValue: CachedData<{}> | undefined) => {
                 if (persistentStorageValue === undefined) {
-                    return this.fetchAndSaveInCacheIfExpired<T>(request); // Not in the persistent storage means we must fetch from API
+                    return this.fetchAndSaveInCacheIfExpired<T>(request, DataSource.HttpRequest); // Not in the persistent storage means we must fetch from API
                 } else {
                     // We have something from the cache
                     const persistentStorageEntry = persistentStorageValue as CachedData<T>;
-                    this.fetchAndSaveInCacheIfExpired<T>(request, persistentStorageEntry); // It's expired which mean we fetch to get fresh data HOWEVER, we will return the obsolete data to have a fast response
+                    this.fetchAndSaveInCacheIfExpired<T>(request, DataSource.PersistentStorageCache, persistentStorageEntry); // It's expired which mean we fetch to get fresh data HOWEVER, we will return the obsolete data to have a fast response
                     // Return the persistent storage even if expired
                     return Promise.resolve({
                         source: DataSource.PersistentStorageCache,
@@ -142,7 +142,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 }
             });
         } else {
-            this.fetchAndSaveInCacheIfExpired<T>(request, memoryCacheEntry); // We have something in the memory, but we might still want to fetch if expire for future requests
+            this.fetchAndSaveInCacheIfExpired<T>(request, DataSource.MemoryCache, memoryCacheEntry); // We have something in the memory, but we might still want to fetch if expire for future requests
             return Promise.resolve({
                 source: DataSource.MemoryCache,
                 result: memoryCacheEntry.payload
@@ -150,8 +150,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         }
     }
 
-    public fetchAndSaveInCacheIfExpired<T>(request: AjaxRequest, cacheEntry?: CachedData<T>): Promise<DataResponse<T>> {
-        if (cacheEntry === undefined || new Date().getTime() > cacheEntry.expirationDateTime.getTime()) {
+    public fetchAndSaveInCacheIfExpired<T>(request: AjaxRequest, source: DataSource, cacheEntry?: CachedData<T> | undefined): Promise<DataResponse<T>> {
+        if (cacheEntry === undefined || (new Date()).getTime() > new Date(cacheEntry.expirationDateTime).getTime()) {
             return this.fetchWithAjax<T>(request).then((value: AxiosResponse<T>) => {
                 return this.saveCache(request, {
                     source: DataSource.HttpRequest,
@@ -160,7 +160,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             });
         } else {
             return Promise.resolve({
-                source: DataSource.MemoryCache, // This might be from the persistent storage as well
+                source: source, // This might be from the persistent storage as well
                 result: cacheEntry.payload
             });
         }
@@ -191,33 +191,29 @@ export class DataAccessSingleton implements IDataAccessSingleton {
     public saveCache<T>(request: AjaxRequest, responseFromCacheOrAjax: DataResponse<T>): Promise<DataResponse<T>> {
         // At the end, we check if we need to store in any of the cache
         if (request.memoryCache !== undefined) {
-            if (responseFromCacheOrAjax.source === DataSource.HttpRequest) {
-                this.addMemoryCache(request.id!, request.memoryCache.lifespanInSeconds!, responseFromCacheOrAjax.result);
-            }
+            this.addInMemoryCache(request.id!, request.memoryCache.lifespanInSeconds!, responseFromCacheOrAjax.result);
         }
         if (request.persistentCache !== undefined) {
-            if (responseFromCacheOrAjax.source === DataSource.HttpRequest) {
-                const currentUTCDataWithLifeSpanAdded = new Date(new Date().getTime() + request.persistentCache.lifespanInSeconds * 1000);
-                const cachedData: CachedData<T> = {
-                    expirationDateTime: currentUTCDataWithLifeSpanAdded,
-                    payload: responseFromCacheOrAjax.result
-                };
-                this.savePersistentStore(request.id!, cachedData).catch((reason: any) => {
-                    this.options.log(reason);
-                });
-            }
+            const currentUTCDataWithLifeSpanAdded = new Date((new Date()).getTime() + request.persistentCache.lifespanInSeconds * 1000);
+            const cachedData: CachedData<T> = {
+                expirationDateTime: currentUTCDataWithLifeSpanAdded,
+                payload: responseFromCacheOrAjax.result
+            };
+            this.addInPersistentStore(request.id!, cachedData).catch((reason: any) => {
+                this.options.log(reason);
+            });
         }
         return Promise.resolve(responseFromCacheOrAjax);
     }
 
     public tryMemoryCacheFetching<T>(request: AjaxRequest): Promise<DataResponse<T> | undefined> {
-        if (this.options.isCacheEnabled === false) {
+        if (this.options.isCacheEnabled === false || request.memoryCache === undefined) {
             return Promise.resolve(undefined);
         }
-        const cacheEntry: CachedData<T> | undefined = this.cachedResponse.get(request.id!);
+        const cacheEntry: CachedData<T> | undefined = this.getMemoryStoreData(request.id!);
         if (cacheEntry !== undefined) {
             // If expired, fetch
-            if (new Date().getTime() > cacheEntry.expirationDateTime.getTime()) {
+            if ((new Date()).getTime() > (new Date(cacheEntry.expirationDateTime)).getTime()) {
                 // Delete from cache
                 this.deleteFromMemoryCache(request.id!);
             } else {
@@ -238,7 +234,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         return this.getPersistentStoreData(request.id!).then((persistentStorageValue: CachedData<{}> | undefined) => {
             if (persistentStorageValue !== undefined) {
                 const localStorageCacheEntry = persistentStorageValue as CachedData<T>;
-                if (new Date().getTime() > localStorageCacheEntry.expirationDateTime.getTime()) {
+                if (new Date().getTime() > (new Date(localStorageCacheEntry.expirationDateTime)).getTime()) {
                     this.removePersistentStorage(request.id!).catch((reason: any) => {
                         this.options.log(reason);
                     });
@@ -287,15 +283,15 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         this.onGoingRequest.delete(id);
     }
 
-    public addMemoryCache<T>(id: string, lifespanInSeconds: number, dataToAdd: T): void {
-        const currentUTCDataWithLifeSpanAdded = new Date(new Date().getTime() + lifespanInSeconds * 1000);
+    public addInMemoryCache<T>(id: string, lifespanInSeconds: number, dataToAdd: T): void {
+        const currentUTCDataWithLifeSpanAdded = new Date((new Date()).getTime() + lifespanInSeconds * 1000);
         this.cachedResponse.set(id, {
             expirationDateTime: currentUTCDataWithLifeSpanAdded,
             payload: dataToAdd
         });
     }
 
-    public savePersistentStore<T>(id: string, cacheData: CachedData<T>): Promise<string> {
+    public addInPersistentStore<T>(id: string, cacheData: CachedData<T>): Promise<string> {
         return this.openIndexDb.transaction("rw", this.openIndexDb.data, async () => {
             return this.openIndexDb.data.put({ id: id, ...cacheData });
         });
