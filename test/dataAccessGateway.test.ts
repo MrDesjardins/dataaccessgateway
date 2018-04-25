@@ -36,7 +36,7 @@ describe("DataAccessSingleton", () => {
         describe("partial options", () => {
             it("uses default value for unspecified options", () => {
                 das.setConfiguration({ isCacheEnabled: false });
-                expect(das.options.defaultLifeSpanInMinute).toBe(das.DefaultOptions.defaultLifeSpanInMinute);
+                expect(das.options.defaultLifeSpanInSeconds).toBe(das.DefaultOptions.defaultLifeSpanInSeconds);
             });
         });
         describe("with version provided", () => {
