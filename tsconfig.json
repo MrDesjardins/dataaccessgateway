@@ -1,0 +1,33 @@
+{
+    "compilerOptions": {
+        "rootDir": "src",
+        "baseUrl": "src",
+        "outDir": "build",
+        "allowSyntheticDefaultImports": true,
+        "alwaysStrict": true,
+        "declaration": true,
+        "downlevelIteration": true,
+        "forceConsistentCasingInFileNames": true,
+        "lib": [
+            "es6"
+        ],
+        "module": "es6",
+        "target": "es6",
+        "pretty": true,
+        "sourceMap": true,
+        "moduleResolution": "node",
+        "noImplicitAny": true,
+        "noUnusedLocals": true,
+        "noUnusedParameters": true,
+        "strict": true
+    },
+    "include": [
+        "src/**/*.ts"
+    ],
+    "exclude": [
+        "build",
+        "node_modules",
+        "test",
+        "**/*.test.ts"
+    ]
+}
