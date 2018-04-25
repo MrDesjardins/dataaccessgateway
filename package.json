@@ -2,7 +2,12 @@
   "name": "dataaccessgateway",
   "version": "0.0.1",
   "description": "A simple library that cache in two different levels HTTP requests",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MrDesjardins/dataaccessgateway"
+  },
   "main": "build/index.js",
+  "types": "build/index.d.ts",
   "scripts": {
     "build": "webpack --env.production",
     "builddev": "node_modules/typescript/bin/tsc",
