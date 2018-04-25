@@ -59,5 +59,4 @@ coverage.json
 
 .vscode/settings.json
 
-build
 node_modules

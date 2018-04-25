@@ -2,7 +2,7 @@
     "compilerOptions": {
         "rootDir": "src",
         "baseUrl": "src",
-        "outDir": "build",
+        "outDir": "dist",
         "allowSyntheticDefaultImports": true,
         "alwaysStrict": true,
         "declaration": true,
@@ -25,7 +25,7 @@
         "src/**/*.ts"
     ],
     "exclude": [
-        "build",
+        "dist",
         "node_modules",
         "test",
         "**/*.test.ts"

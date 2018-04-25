@@ -1,45 +1,43 @@
-const path = require('path');
-const webpack = require('webpack');
-const merge = require('webpack-merge');
-const CleanWebpackPlugin = require('clean-webpack-plugin');
-const UglifyJSPlugin = require('uglifyjs-webpack-plugin');
+const path = require("path");
+const webpack = require("webpack");
+const CleanWebpackPlugin = require("clean-webpack-plugin");
+const UglifyJSPlugin = require("uglifyjs-webpack-plugin");
+
+const pkg = require("./package.json");
 module.exports = {
-    entry: './index',
+    mode: "production",
+    entry: "./src/index",
     output: {
-        filename: 'index.js',
-        path: path.resolve(root, 'build'),
+        path: path.join(__dirname, "dist"),
+        filename: "index.js",
         library: pkg.name,
-        libraryTarget: 'umd'
+        libraryTarget: "umd"
     },
     plugins: [
         new webpack.DefinePlugin({
             __VERSION__: JSON.stringify(pkg.version)
         }),
-        new CleanWebpackPlugin(['build', 'dist'], {
-            root: root
+        new CleanWebpackPlugin(["build", "dist"], {
+            root: __dirname
         })
     ],
-    devtool: env.production ? 'source-map' : 'eval-source-map',
+    devtool: "source-map",
     resolve: {
-        extensions: ['.ts', '.tsx', '.js', '.jsx', '.json']
+        extensions: [".ts", ".js", ".json"]
     },
     module: {
         rules: [
             {
                 test: /\.(js|ts)x?$/,
-                loader: 'ts-loader',
+                loader: "ts-loader",
                 exclude: [/node_modules/]
             },
             {
-                enforce: 'pre',
+                enforce: "pre",
                 test: /\.js$/,
-                loader: 'source-map-loader',
+                loader: "source-map-loader",
                 exclude: [/node_modules/]
             }
         ]
-    },
-    externals: {
-        react: 'React',
-        'react-dom': 'ReactDOM'
     }
 };
