@@ -26,9 +26,9 @@ Here is the flow from the actor request call up to when the data is coming back.
 
 ![alt text](https://github.com/MrDesjardins/dataaccessgateway/raw/master/images/freshFetchFlowDiagram.png "Fresh Fetch Flow Diagram")
 
-### Fast Fresh 
+### Fetch Fast 
 
-The second mode, `fastFetch` will return the data from any cache (memory first, then persistent cache second) if available regardless of the expiration. However, it will fetch in background and fill the caches giving the opportunity to subsequent calls to have fresh values.
+The second mode, `fetchFast` will return the data from any cache (memory first, then persistent cache second) if available regardless of the expiration. However, it will fetch in background and fill the caches giving the opportunity to subsequent calls to have fresh values.
 
 Here is the flow from the actor request call up to when the data is coming back.
 ![alt text](https://github.com/MrDesjardins/dataaccessgateway/raw/master/images/fastFetchFlowDiagram.png "Fast Fetch Flow Diagram")
