@@ -2,6 +2,8 @@
 
 [![Build Status](https://travis-ci.org/MrDesjardins/dataaccessgateway.svg?branch=master)](https://travis-ci.org/MrDesjardins/dataaccessgateway)
 [![Coverage Status](https://coveralls.io/repos/github/MrDesjardins/dataaccessgateway/badge.svg?branch=master)](https://coveralls.io/github/MrDesjardins/dataaccessgateway?branch=master)
+[![npm version](https://badge.fury.io/js/dataaccessgateway.svg)](https://badge.fury.io/js/dataaccessgateway)
+
 
 The goal of this library is to provide a tiny abstraction to cache data from API calls easily without having to configure many options. It works with two levels of cache. The first one is a memory cache and the second use IndexDB as a persistent cache.
 
