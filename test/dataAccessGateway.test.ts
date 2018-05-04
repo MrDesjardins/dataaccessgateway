@@ -1,4 +1,4 @@
-import { DataAccessSingleton } from "../src/dataAccessGateway";
+import { DataAccessSingleton, DeleteCacheOptions } from "../src/dataAccessGateway";
 import { AjaxRequest, CachedData, DataResponse, DataSource } from "../src/model";
 const cacheDataExpired: CachedData<string> = {
     expirationDateTime: new Date((new Date()).getTime() - 10000),
@@ -515,17 +515,81 @@ describe("DataAccessSingleton", () => {
             });
         });
         describe("deleteDataFromCache", () => {
-            beforeEach(() => {
-                das.deleteFromMemoryCache = jest.fn().mockRejectedValue("test");
-                das.deleteFromPersistentStorage = jest.fn().mockRejectedValue("test");
+            describe("when no option", () => {
+                beforeEach(() => {
+                    das.deleteFromMemoryCache = jest.fn().mockRejectedValue("test");
+                    das.deleteFromPersistentStorage = jest.fn().mockRejectedValue("test");
+                });
+                it("removes it from the memory cache", () => {
+                    das.deleteDataFromCache("1");
+                    expect(das.deleteFromMemoryCache).toHaveBeenCalledTimes(1);
+                });
+                it("removes it from the persistent cache", () => {
+                    das.deleteDataFromCache("1");
+                    expect(das.deleteFromPersistentStorage).toHaveBeenCalledTimes(1);
+                });
             });
-            it("removes it from the memory cache", () => {
-                das.deleteDataFromCache("1");
-                expect(das.deleteFromMemoryCache).toHaveBeenCalledTimes(1);
-            });
-            it("removes it from the persistent cache", () => {
-                das.deleteDataFromCache("1");
-                expect(das.deleteFromPersistentStorage).toHaveBeenCalledTimes(1);
+            describe("when option", () => {
+                beforeEach(() => {
+                    das.deleteFromMemoryCache = jest.fn().mockRejectedValue("test");
+                    das.deleteFromPersistentStorage = jest.fn().mockRejectedValue("test");
+                });
+                describe("when memory option only", () => {
+                    let options: DeleteCacheOptions
+                    beforeEach(() => {
+                        options = { memory: true };
+                    });
+                    it("removes it from the memory cache", () => {
+                        das.deleteDataFromCache("1", options);
+                        expect(das.deleteFromMemoryCache).toHaveBeenCalledTimes(1);
+                    });
+                    it("does NOT remove it from the persistent cache", () => {
+                        das.deleteDataFromCache("1", options);
+                        expect(das.deleteFromPersistentStorage).toHaveBeenCalledTimes(0);
+                    });
+                });
+                describe("when memory option true, persistence false", () => {
+                    let options: DeleteCacheOptions
+                    beforeEach(() => {
+                        options = { memory: true, persistent: false };
+                    });
+                    it("removes it from the memory cache", () => {
+                        das.deleteDataFromCache("1", options);
+                        expect(das.deleteFromMemoryCache).toHaveBeenCalledTimes(1);
+                    });
+                    it("does NOT remove it from the persistent cache", () => {
+                        das.deleteDataFromCache("1", options);
+                        expect(das.deleteFromPersistentStorage).toHaveBeenCalledTimes(0);
+                    });
+                });
+                describe("when persistence option only", () => {
+                    let options: DeleteCacheOptions
+                    beforeEach(() => {
+                        options = { persistent: true };
+                    });
+                    it("removes it from the memory cache", () => {
+                        das.deleteDataFromCache("1", options);
+                        expect(das.deleteFromMemoryCache).toHaveBeenCalledTimes(0);
+                    });
+                    it("does NOT remove it from the persistent cache", () => {
+                        das.deleteDataFromCache("1", options);
+                        expect(das.deleteFromPersistentStorage).toHaveBeenCalledTimes(1);
+                    });
+                });
+                describe("when persistence true, memory false", () => {
+                    let options: DeleteCacheOptions
+                    beforeEach(() => {
+                        options = { persistent: true, memory: false };
+                    });
+                    it("removes it from the memory cache", () => {
+                        das.deleteDataFromCache("1", options);
+                        expect(das.deleteFromMemoryCache).toHaveBeenCalledTimes(0);
+                    });
+                    it("does NOT remove it from the persistent cache", () => {
+                        das.deleteDataFromCache("1", options);
+                        expect(das.deleteFromPersistentStorage).toHaveBeenCalledTimes(1);
+                    });
+                });
             });
         });
     });

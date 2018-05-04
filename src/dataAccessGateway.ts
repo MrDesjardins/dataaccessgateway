@@ -44,6 +44,11 @@ export interface IDataAccessSingleton {
     deleteDataFromCache(id: string): void;
 }
 
+export interface DeleteCacheOptions {
+    memory?: boolean;
+    persistent?: boolean;
+}
+
 /**
  * The Data Access is a singleton because we want to keep all the application data into
  * a single source avoiding duplication of cache.
@@ -308,9 +313,18 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         return this.openIndexDb.data.delete(id);
     }
 
-    public deleteDataFromCache(id: string): void {
-        this.deleteFromPersistentStorage(id);
-        this.deleteFromMemoryCache(id);
+    public deleteDataFromCache(id: string, options?: DeleteCacheOptions): void {
+        if (options === undefined) {
+            this.deleteFromMemoryCache(id);
+            this.deleteFromPersistentStorage(id);
+        } else {
+            if (options.memory !== undefined && options.memory === true) {
+                this.deleteFromMemoryCache(id);
+            }
+            if (options.persistent !== undefined && options.persistent === true) {
+                this.deleteFromPersistentStorage(id);
+            }
+        }
     }
 }
 const DataAccessGateway = DataAccessSingleton.getInstance();
