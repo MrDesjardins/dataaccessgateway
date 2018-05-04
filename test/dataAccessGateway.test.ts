@@ -1,5 +1,5 @@
 import { DataAccessSingleton } from "../src/dataAccessGateway";
-import { AjaxRequest, CachedData, DataSource, DataResponse } from "../src/model";
+import { AjaxRequest, CachedData, DataResponse, DataSource } from "../src/model";
 const cacheDataExpired: CachedData<string> = {
     expirationDateTime: new Date((new Date()).getTime() - 10000),
     payload: "Test"
@@ -19,7 +19,7 @@ describe("DataAccessSingleton", () => {
         das = new DataAccessSingleton();
         das.addInPersistentStore = jest.fn().mockRejectedValue("test");
         das.getPersistentStoreData = jest.fn().mockRejectedValue("test");
-        das.removePersistentStorage = jest.fn().mockRejectedValue("test");
+        das.deleteFromPersistentStorage = jest.fn().mockRejectedValue("test");
         request = {
             request: {
                 url: "http://request"
@@ -460,15 +460,15 @@ describe("DataAccessSingleton", () => {
             describe("when persistent cache has an expired data", () => {
                 beforeEach(() => {
                     das.getPersistentStoreData = jest.fn().mockResolvedValue(cacheDataExpired);
-                    das.removePersistentStorage = jest.fn().mockResolvedValue(cacheDataExpired);
+                    das.deleteFromPersistentStorage = jest.fn().mockResolvedValue(cacheDataExpired);
                 });
                 it("deletes the data from the cache", async () => {
                     await das.tryPersistentStorageFetching(request);
-                    expect(das.removePersistentStorage).toHaveBeenCalledTimes(1);
+                    expect(das.deleteFromPersistentStorage).toHaveBeenCalledTimes(1);
                 });
                 describe("when fail to remove", () => {
                     beforeEach(() => {
-                        das.removePersistentStorage = jest.fn().mockRejectedValue("Test");
+                        das.deleteFromPersistentStorage = jest.fn().mockRejectedValue("Test");
                         das.options.log = jest.fn();
                     });
                     it("calls the option log", async () => {
@@ -512,6 +512,20 @@ describe("DataAccessSingleton", () => {
                 } catch{
 
                 }
+            });
+        });
+        describe("deleteDataFromCache", () => {
+            beforeEach(() => {
+                das.deleteFromMemoryCache = jest.fn().mockRejectedValue("test");
+                das.deleteFromPersistentStorage = jest.fn().mockRejectedValue("test");
+            });
+            it("removes it from the memory cache", () => {
+                das.deleteDataFromCache("1");
+                expect(das.deleteFromMemoryCache).toHaveBeenCalledTimes(1);
+            });
+            it("removes it from the persistent cache", () => {
+                das.deleteDataFromCache("1");
+                expect(das.deleteFromPersistentStorage).toHaveBeenCalledTimes(1);
             });
         });
     });
