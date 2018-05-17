@@ -1,7 +1,7 @@
 
-import axios, { AxiosResponse, AxiosPromise } from "axios";
+import axios, { AxiosPromise, AxiosResponse } from "axios";
 import Dexie from "dexie";
-import { CacheDataWithId, OnGoingAjaxRequest, CachedData, AjaxRequest, DataResponse, DataSource } from "./model";
+import { AjaxRequest, CacheDataWithId, CachedData, DataResponse, DataSource, OnGoingAjaxRequest } from "./model";
 export class DataAccessIndexDbDatabase extends Dexie {
     public data!: Dexie.Table<CacheDataWithId<any>, string>; // Will be initialized later
 
@@ -41,6 +41,12 @@ export interface IDataAccessSingleton {
     setConfiguration(options?: Partial<DataAccessSingletonOptions>): void;
     fetchFresh<T>(request: AjaxRequest): Promise<DataResponse<T>>;
     fetchFast<T>(request: AjaxRequest): Promise<DataResponse<T>>
+    deleteDataFromCache(id: string): void;
+}
+
+export interface DeleteCacheOptions {
+    memory?: boolean;
+    persistent?: boolean;
 }
 
 /**
@@ -235,7 +241,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             if (persistentStorageValue !== undefined) {
                 const localStorageCacheEntry = persistentStorageValue as CachedData<T>;
                 if (new Date().getTime() > (new Date(localStorageCacheEntry.expirationDateTime)).getTime()) {
-                    this.removePersistentStorage(request.id!).catch((reason: any) => {
+                    this.deleteFromPersistentStorage(request.id!).catch((reason: any) => {
                         this.options.log(reason);
                     });
                 } else {
@@ -303,8 +309,22 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         return this.openIndexDb.data.get(id);
     }
 
-    public removePersistentStorage(id: string): Promise<void> {
+    public deleteFromPersistentStorage(id: string): Promise<void> {
         return this.openIndexDb.data.delete(id);
+    }
+
+    public deleteDataFromCache(id: string, options?: DeleteCacheOptions): void {
+        if (options === undefined) {
+            this.deleteFromMemoryCache(id);
+            this.deleteFromPersistentStorage(id);
+        } else {
+            if (options.memory !== undefined && options.memory === true) {
+                this.deleteFromMemoryCache(id);
+            }
+            if (options.persistent !== undefined && options.persistent === true) {
+                this.deleteFromPersistentStorage(id);
+            }
+        }
     }
 }
 const DataAccessGateway = DataAccessSingleton.getInstance();
