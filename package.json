@@ -12,8 +12,8 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "webpack --env.production",
-    "builddev": "webpack --env.development",
+    "build": "webpack --config webpack.prod.js --env.production",
+    "builddev": "webpack --config webpack.dev.js --env.development",
     "builddtsc": "node_modules/typescript/bin/tsc",
     "test": "node_modules/jest-cli/bin/jest.js",
     "testdev": "node_modules/jest-cli/bin/jest.js --watch",
@@ -52,7 +52,8 @@
     "typescript": "^2.8.3",
     "uglifyjs-webpack-plugin": "^1.2.5",
     "webpack": "^4.6.0",
-    "webpack-cli": "^2.0.15"
+    "webpack-cli": "^2.0.15",
+    "webpack-merge": "^4.1.2"
   },
   "jest": {
     "globals": {
