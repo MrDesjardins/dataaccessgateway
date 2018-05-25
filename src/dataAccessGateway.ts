@@ -64,7 +64,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
     };
     public options: DataAccessSingletonOptions = this.DefaultOptions;
     private onGoingRequest: Map<string, OnGoingAjaxRequest> = new Map<string, OnGoingAjaxRequest>();
-    private cachedResponse: Map<string, CachedData<any>> = new Map<string, CachedData<any>>();
+    private cachedResponse: Map<string, string> = new Map<string, string>();
     public openIndexDb: DataAccessIndexDbDatabase;
     public constructor() {
         this.openIndexDb = new DataAccessIndexDbDatabase();
@@ -137,8 +137,11 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 if (persistentStorageValue === undefined) {
                     return this.fetchAndSaveInCacheIfExpired<T>(request, DataSource.HttpRequest); // Not in the persistent storage means we must fetch from API
                 } else {
-                    // We have something from the cache
+                    // We have something from the persistent cache
                     const persistentStorageEntry = persistentStorageValue as CachedData<T>;
+                    if (request.memoryCache !== undefined) {
+                        this.addInMemoryCache(request.id!, request.memoryCache.lifespanInSeconds!, persistentStorageEntry.payload);
+                    }
                     this.fetchAndSaveInCacheIfExpired<T>(request, DataSource.PersistentStorageCache, persistentStorageEntry); // It's expired which mean we fetch to get fresh data HOWEVER, we will return the obsolete data to have a fast response
                     // Return the persistent storage even if expired
                     return Promise.resolve({
@@ -291,10 +294,10 @@ export class DataAccessSingleton implements IDataAccessSingleton {
 
     public addInMemoryCache<T>(id: string, lifespanInSeconds: number, dataToAdd: T): void {
         const currentUTCDataWithLifeSpanAdded = new Date((new Date()).getTime() + lifespanInSeconds * 1000);
-        this.cachedResponse.set(id, {
+        this.cachedResponse.set(id, JSON.stringify({
             expirationDateTime: currentUTCDataWithLifeSpanAdded,
             payload: dataToAdd
-        });
+        }));
     }
 
     public addInPersistentStore<T>(id: string, cacheData: CachedData<T>): Promise<string> {
@@ -303,7 +306,11 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         });
     }
     public getMemoryStoreData<T>(id: string): CachedData<T> | undefined {
-        return this.cachedResponse.get(id);
+        const cacheValue = this.cachedResponse.get(id);
+        if (cacheValue === undefined) {
+            return undefined;
+        }
+        return JSON.parse(cacheValue) as CachedData<T>;
     }
     public async getPersistentStoreData<T>(id: string): Promise<CacheDataWithId<T> | undefined> {
         return this.openIndexDb.data.get(id);

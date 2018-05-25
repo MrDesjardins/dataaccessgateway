@@ -5,7 +5,7 @@ const UglifyJSPlugin = require("uglifyjs-webpack-plugin");
 
 const pkg = require("./package.json");
 module.exports = {
-    mode: "production",
+    mode: "development",
     entry: "./src/index",
     output: {
         path: path.join(__dirname, "dist"),

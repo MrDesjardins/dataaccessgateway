@@ -1,5 +1,9 @@
 import { DataAccessSingleton, DeleteCacheOptions } from "../src/dataAccessGateway";
 import { AjaxRequest, CachedData, DataResponse, DataSource } from "../src/model";
+interface FakeObject {
+    id: string;
+    name: string;
+}
 const cacheDataExpired: CachedData<string> = {
     expirationDateTime: new Date((new Date()).getTime() - 10000),
     payload: "Test"
@@ -160,10 +164,20 @@ describe("DataAccessSingleton", () => {
                     describe("when data in persistent cache has NOT expired", () => {
                         beforeEach(() => {
                             das.getPersistentStoreData = jest.fn().mockResolvedValue(cacheDataNotExpired);
+                            das.addInMemoryCache = jest.fn();
                         });
                         it("invokes fetch (but won't fetch)", async () => {
                             await das.fetchFast(request);
                             expect(das.fetchAndSaveInCacheIfExpired).toHaveBeenCalledTimes(1);
+                        });
+                        describe("when memory cache enabled", () => {
+                            beforeEach(() => {
+                                request.memoryCache = { lifespanInSeconds: 120 };
+                            });
+                            it("adds in memory", async () => {
+                                await das.fetchFast(request);
+                                expect(das.addInMemoryCache).toHaveBeenCalledTimes(1);
+                            });
                         });
                     });
                     describe("when NO data in persistence cache ", () => {
@@ -592,5 +606,30 @@ describe("DataAccessSingleton", () => {
                 });
             });
         });
+    });
+    describe("addInMemoryCache", () => {
+        describe("when add an object", () => {
+            let originalObject: FakeObject;
+            beforeEach(() => {
+                originalObject = { id: "1", name: "Test1" };
+            });
+            it("adds a copy of the data to add", () => {
+                das.addInMemoryCache("1", 10, originalObject);
+                const result = das.getMemoryStoreData("1");
+                expect(result.payload).not.toBe(originalObject);
+            });
+        });
+        describe("when add an array", () => {
+            let originalArray: FakeObject[];
+            beforeEach(() => {
+                originalArray = [];
+                originalArray.push({ id: "1", name: "Test1" });
+            });
+            it("returns an array", () => {
+                das.addInMemoryCache("1", 10, originalArray);
+                const result = das.getMemoryStoreData("1");
+                expect(result.payload instanceof Array).toBeTruthy();
+            });
+        })
     });
 });
