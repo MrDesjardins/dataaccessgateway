@@ -295,16 +295,6 @@ describe("DataAccessSingleton", () => {
                 await das.saveCache(request, response);
                 expect(das.addInPersistentStore).toHaveBeenCalledTimes(1);
             });
-            describe("when saving in persistent storage fail to save", () => {
-                beforeEach(() => {
-                    das.addInPersistentStore = jest.fn().mockRejectedValue("Error");
-                    das.options.log = jest.fn();
-                });
-                it("calls the option log", async () => {
-                    await das.saveCache(request, response);
-                    expect(das.options.log).toHaveBeenCalledTimes(1);
-                });
-            });
         });
         it("returns the response from the parameter", async () => {
             const result = await das.saveCache(request, response);
@@ -483,12 +473,12 @@ describe("DataAccessSingleton", () => {
                 describe("when fail to remove", () => {
                     beforeEach(() => {
                         das.deleteFromPersistentStorage = jest.fn().mockRejectedValue("Test");
-                        das.options.log = jest.fn();
+                        das.options.logError = jest.fn();
                     });
                     it("calls the option log", async () => {
                         try {
                             await das.tryPersistentStorageFetching(request);
-                            expect(das.options.log).toHaveBeenCalledTimes(1);
+                            expect(das.options.logError).toHaveBeenCalledTimes(1);
                         } catch{
 
                         }
@@ -517,12 +507,12 @@ describe("DataAccessSingleton", () => {
         describe("when reject promise", () => {
             beforeEach(() => {
                 das.getPersistentStoreData = jest.fn().mockRejectedValue("Test");
-                das.options.log = jest.fn();
+                das.options.logError = jest.fn();
             });
             it("calls the option log", async () => {
                 try {
                     await das.tryPersistentStorageFetching(request);
-                    expect(das.options.log).toHaveBeenCalledTimes(1);
+                    expect(das.options.logError).toHaveBeenCalledTimes(1);
                 } catch{
 
                 }

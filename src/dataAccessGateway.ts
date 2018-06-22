@@ -1,12 +1,12 @@
 
 import axios, { AxiosPromise, AxiosResponse } from "axios";
 import Dexie from "dexie";
-import { AjaxRequest, CacheDataWithId, CachedData, DataResponse, DataSource, OnGoingAjaxRequest } from "./model";
+import { AjaxRequest, CacheDataWithId, CachedData, DataAction, DataResponse, DataSource, LogError, LogInfo, OnGoingAjaxRequest } from "./model";
 export class DataAccessIndexDbDatabase extends Dexie {
     public data!: Dexie.Table<CacheDataWithId<any>, string>; // Will be initialized later
 
-    public constructor() {
-        super("DataFromServer");
+    public constructor(databaseName: string) {
+        super(databaseName);
         this.changeVersion(1);
     }
 
@@ -23,13 +23,13 @@ export class DataAccessIndexDbDatabase extends Dexie {
         return Promise.reject("Table cannot be drop because it is not defined");
     }
 }
-
 export interface DataAccessSingletonOptions {
     isCacheEnabled: boolean;
     isCacheMandatoryIfEnabled: boolean;
     defaultLifeSpanInSeconds: number;
     version: number;
-    log: (error: any) => void;
+    logError: (error: LogError) => void;
+    logInfo: (info: LogInfo) => void;
 }
 
 /**
@@ -54,23 +54,28 @@ export interface DeleteCacheOptions {
  * a single source avoiding duplication of cache.
  */
 export class DataAccessSingleton implements IDataAccessSingleton {
-    private static instance: DataAccessSingleton = new DataAccessSingleton();
+    private static instance: DataAccessSingleton | undefined = undefined;
     public DefaultOptions: Readonly<DataAccessSingletonOptions> = {
         isCacheEnabled: true,
         isCacheMandatoryIfEnabled: true,
         defaultLifeSpanInSeconds: 5 * 60,
         version: 1,
-        log: () => { /*Nothing*/ }
+        logError: () => { /*Nothing*/ },
+        logInfo: () => { /*Nothing*/ },
     };
     public options: DataAccessSingletonOptions = this.DefaultOptions;
     private onGoingRequest: Map<string, OnGoingAjaxRequest> = new Map<string, OnGoingAjaxRequest>();
     private cachedResponse: Map<string, string> = new Map<string, string>();
     public openIndexDb: DataAccessIndexDbDatabase;
-    public constructor() {
-        this.openIndexDb = new DataAccessIndexDbDatabase();
+    public constructor(databaseName: string) {
+        this.openIndexDb = new DataAccessIndexDbDatabase(databaseName);
     }
 
-    public static getInstance(): IDataAccessSingleton {
+    public static getInstance(databaseName: string): IDataAccessSingleton {
+        if (DataAccessSingleton.instance === undefined) {
+            DataAccessSingleton.instance = new DataAccessSingleton(databaseName);
+        }
+
         return DataAccessSingleton.instance;
     }
 
@@ -208,9 +213,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 expirationDateTime: currentUTCDataWithLifeSpanAdded,
                 payload: responseFromCacheOrAjax.result
             };
-            this.addInPersistentStore(request.id!, cachedData).catch((reason: any) => {
-                this.options.log(reason);
-            });
+            this.addInPersistentStore(request.id!, cachedData);
         }
         return Promise.resolve(responseFromCacheOrAjax);
     }
@@ -226,6 +229,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 // Delete from cache
                 this.deleteFromMemoryCache(request.id!);
             } else {
+                this.options.logInfo({ id: request.id!, source: DataSource.MemoryCache, action: DataAction.Fetch });
                 // Return the cached response
                 return Promise.resolve({
                     source: DataSource.MemoryCache,
@@ -244,10 +248,9 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             if (persistentStorageValue !== undefined) {
                 const localStorageCacheEntry = persistentStorageValue as CachedData<T>;
                 if (new Date().getTime() > (new Date(localStorageCacheEntry.expirationDateTime)).getTime()) {
-                    this.deleteFromPersistentStorage(request.id!).catch((reason: any) => {
-                        this.options.log(reason);
-                    });
+                    this.deleteFromPersistentStorage(request.id!);
                 } else {
+                    this.options.logInfo({ id: request.id!, source: DataSource.PersistentStorageCache, action: DataAction.Fetch });
                     return Promise.resolve({
                         source: DataSource.PersistentStorageCache,
                         result: localStorageCacheEntry.payload
@@ -256,7 +259,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             }
             return Promise.resolve(undefined);
         }).catch((reason: any) => {
-            this.options.log(reason);
+            this.options.logError({ error: reason, source: DataSource.PersistentStorageCache, action: DataAction.Fetch });
             throw reason;
         });
     }
@@ -270,7 +273,11 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             const promiseAjaxResponse = axios(request.request)
                 .then((response: AxiosResponse<T>) => {
                     this.deleteOnGoingRequest(request.id!);
+                    this.options.logInfo({ id: request.id!, source: DataSource.HttpRequest, action: DataAction.Fetch });
                     return response;
+                }).catch((reason) => {
+                    this.options.logError({ error: reason, source: DataSource.PersistentStorageCache, action: DataAction.Fetch });
+                    throw reason;
                 });
             // Add into the on-going queue
             this.onGoingRequest.set(request.id!, {
@@ -285,6 +292,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
     }
 
     public deleteFromMemoryCache(id: string): void {
+        this.options.logInfo({ id: id, source: DataSource.MemoryCache, action: DataAction.Delete });
         this.cachedResponse.delete(id);
     }
 
@@ -294,15 +302,19 @@ export class DataAccessSingleton implements IDataAccessSingleton {
 
     public addInMemoryCache<T>(id: string, lifespanInSeconds: number, dataToAdd: T): void {
         const currentUTCDataWithLifeSpanAdded = new Date((new Date()).getTime() + lifespanInSeconds * 1000);
+        this.options.logInfo({ id: id, source: DataSource.MemoryCache, action: DataAction.Save });
         this.cachedResponse.set(id, JSON.stringify({
             expirationDateTime: currentUTCDataWithLifeSpanAdded,
             payload: dataToAdd
         }));
     }
 
-    public addInPersistentStore<T>(id: string, cacheData: CachedData<T>): Promise<string> {
-        return this.openIndexDb.transaction("rw", this.openIndexDb.data, async () => {
+    public addInPersistentStore<T>(id: string, cacheData: CachedData<T>): void {
+        this.options.logInfo({ id: id, source: DataSource.PersistentStorageCache, action: DataAction.Save });
+        this.openIndexDb.transaction("rw", this.openIndexDb.data, async () => {
             return this.openIndexDb.data.put({ id: id, ...cacheData });
+        }).catch((reason) => {
+            this.options.logError({ error: reason, source: DataSource.PersistentStorageCache, action: DataAction.Save });
         });
     }
     public getMemoryStoreData<T>(id: string): CachedData<T> | undefined {
@@ -316,8 +328,10 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         return this.openIndexDb.data.get(id);
     }
 
-    public deleteFromPersistentStorage(id: string): Promise<void> {
-        return this.openIndexDb.data.delete(id);
+    public deleteFromPersistentStorage(id: string): void {
+        this.openIndexDb.data.delete(id).catch((reason) => {
+            this.options.logError({ error: reason, source: DataSource.PersistentStorageCache, action: DataAction.Delete });
+        });
     }
 
     public deleteDataFromCache(id: string, options?: DeleteCacheOptions): void {
@@ -334,5 +348,6 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         }
     }
 }
-const DataAccessGateway = DataAccessSingleton.getInstance();
+const DataAccessGateway: (databaseName: string) => IDataAccessSingleton
+    = (databaseName: string = "DatabaseName") => DataAccessSingleton.getInstance(databaseName);
 export default DataAccessGateway;
