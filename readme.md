@@ -62,7 +62,7 @@ const request: AxiosRequestConfig = {
 };
 
 // Execute the request through DataAccessGateway
-const promiseResult = DataAccessGateway.fetchFast<YourEntityResponse>({
+const promiseResult = DataAccessGateway("AppName").fetchFast<YourEntityResponse>({
                             memoryCache: { lifespanInSeconds: 60 },
                             persistentCache: { lifespanInSeconds: 60 * 60 * 24 },
                             request: request
@@ -72,7 +72,7 @@ const promiseResult = DataAccessGateway.fetchFast<YourEntityResponse>({
 ### Custom key
 It's possible to define custom key if the URL is not unique enough by adding an `id`.
 ``` 
- DataAccessGateway.fetchFast<YourEntityResponse>({
+ DataAccessGateway("AppName").fetchFast<YourEntityResponse>({
                             id: "myUniqueKey",
                             request: request
                         });
@@ -81,17 +81,17 @@ It's possible to define custom key if the URL is not unique enough by adding an 
 ### Error insight
 Most scenario will throw an error that can be caught by the promise. However, some deep case around IndexDb won't be returned because of the asynchronous operation that occur. However, you can add a log function that will be called in the option.
 ```
-DataAccessGateway.setConfiguration({ log: (reason: any) => { Log.trackError(reason); } });
+DataAccessGateway("AppName").setConfiguration({ log: (reason: any) => { Log.trackError(reason); } });
 ``` 
 
 ### Turning off the cache
 It can be handy to turn off the caching capability and have a fall-through to always perform the Ajax request.
 ``` 
-DataAccessGateway.setConfiguration({ isCacheEnabled: true });
+DataAccessGateway("AppName").setConfiguration({ isCacheEnabled: true });
 ``` 
 
 ### Default cache time
 If you want to change the 5 minutes default for anything else you can do it with `setConfiguration`.
 ``` 
-DataAccessGateway.setConfiguration({ defaultLifeSpanInSeconds: 120 });
+DataAccessGateway("AppName").setConfiguration({ defaultLifeSpanInSeconds: 120 });
 ``` 
