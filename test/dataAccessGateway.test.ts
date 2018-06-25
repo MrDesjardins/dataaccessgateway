@@ -201,6 +201,24 @@ describe("DataAccessSingleton", () => {
                         });
                     });
                 });
+
+                describe("when HTTP status 500 followed by a second same call", () => {
+                    beforeEach(() => {
+                        das.getMemoryStoreData = jest.fn().mockReturnValue(undefined);
+                        das.getPersistentStoreData = jest.fn().mockResolvedValue(cacheDataExpired);
+                        das.saveCache = jest.fn();
+                    });
+                    it("calls the Ajax the second call (like the first one)", async () => {
+                        await das.fetchFast(request);
+                        await das.fetchFast(request);
+                        expect(das.fetchAndSaveInCacheIfExpired).toHaveBeenCalledTimes(2);
+                    });
+                    it("NEVER save in cache", async () => {
+                        await das.fetchFast(request);
+                        await das.fetchFast(request);
+                        expect(das.saveCache).toHaveBeenCalledTimes(0);
+                    });
+                });
             });
         });
     });

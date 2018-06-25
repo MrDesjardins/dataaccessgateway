@@ -99,13 +99,16 @@ export class DataAccessSingleton implements IDataAccessSingleton {
 
         return this.tryMemoryCacheFetching<T>(request).then((memoryCacheValue: DataResponse<T> | undefined) => {
             if (memoryCacheValue === undefined) {
+                this.options.logInfo({ action: DataAction.Fetch, id: request.id!, source: DataSource.MemoryCache });
                 return this.tryPersistentStorageFetching<T>(request);
             } else {
+                this.options.logInfo({ action: DataAction.Fetch, id: request.id!, source: DataSource.MemoryCache });
                 return memoryCacheValue;
             }
         }).then((cacheResult: DataResponse<T> | undefined) => {
             if (cacheResult === undefined) {
                 return this.fetchWithAjax<T>(request).then((value: AxiosResponse<T>) => {
+                    this.options.logInfo({ action: DataAction.Fetch, id: request.id!, source: DataSource.HttpRequest });
                     return Promise.resolve({
                         source: DataSource.HttpRequest,
                         result: value.data
@@ -128,6 +131,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
     public fetchFast<T>(request: AjaxRequest): Promise<DataResponse<T>> {
         // If the flag is off, we skip and go directly to the Ajax
         if (!this.options.isCacheEnabled) {
+            this.options.logInfo({ action: DataAction.Fetch, id: request.id!, source: DataSource.HttpRequest });
             return this.fetchAndSaveInCacheIfExpired<T>(request, DataSource.HttpRequest);
         }
 
@@ -140,6 +144,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             // Not in memory, check in long term storage
             return this.getPersistentStoreData(request.id!).then((persistentStorageValue: CachedData<{}> | undefined) => {
                 if (persistentStorageValue === undefined) {
+                    this.options.logInfo({ action: DataAction.Fetch, id: request.id!, source: DataSource.HttpRequest });
                     return this.fetchAndSaveInCacheIfExpired<T>(request, DataSource.HttpRequest); // Not in the persistent storage means we must fetch from API
                 } else {
                     // We have something from the persistent cache
@@ -149,6 +154,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                     }
                     this.fetchAndSaveInCacheIfExpired<T>(request, DataSource.PersistentStorageCache, persistentStorageEntry); // It's expired which mean we fetch to get fresh data HOWEVER, we will return the obsolete data to have a fast response
                     // Return the persistent storage even if expired
+                    this.options.logInfo({ action: DataAction.Fetch, id: request.id!, source: DataSource.PersistentStorageCache });
                     return Promise.resolve({
                         source: DataSource.PersistentStorageCache,
                         result: persistentStorageEntry.payload
@@ -156,6 +162,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 }
             });
         } else {
+            this.options.logInfo({ action: DataAction.Fetch, id: request.id!, source: DataSource.MemoryCache });
             this.fetchAndSaveInCacheIfExpired<T>(request, DataSource.MemoryCache, memoryCacheEntry); // We have something in the memory, but we might still want to fetch if expire for future requests
             return Promise.resolve({
                 source: DataSource.MemoryCache,
@@ -233,7 +240,6 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 // Delete from cache
                 this.deleteFromMemoryCache(request.id!);
             } else {
-                this.options.logInfo({ id: request.id!, source: DataSource.MemoryCache, action: DataAction.Fetch });
                 // Return the cached response
                 return Promise.resolve({
                     source: DataSource.MemoryCache,
@@ -254,7 +260,6 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 if (new Date().getTime() > (new Date(localStorageCacheEntry.expirationDateTime)).getTime()) {
                     this.deleteFromPersistentStorage(request.id!);
                 } else {
-                    this.options.logInfo({ id: request.id!, source: DataSource.PersistentStorageCache, action: DataAction.Fetch });
                     return Promise.resolve({
                         source: DataSource.PersistentStorageCache,
                         result: localStorageCacheEntry.payload
@@ -277,7 +282,6 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             const promiseAjaxResponse = axios(request.request)
                 .then((response: AxiosResponse<T>) => {
                     this.deleteOnGoingRequest(request.id!);
-                    this.options.logInfo({ id: request.id!, source: DataSource.HttpRequest, action: DataAction.Fetch });
                     return response;
                 }).catch((reason) => {
                     this.options.logError({ error: reason, source: DataSource.PersistentStorageCache, action: DataAction.Fetch });
