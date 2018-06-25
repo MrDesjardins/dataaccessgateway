@@ -1,5 +1,7 @@
+import { AxiosResponse } from "../node_modules/axios";
 import { DataAccessSingleton, DeleteCacheOptions } from "../src/dataAccessGateway";
 import { AjaxRequest, CachedData, DataResponse, DataSource } from "../src/model";
+const DATABASE_NAME = "Test";
 interface FakeObject {
     id: string;
     name: string;
@@ -16,11 +18,18 @@ const dataResponseFromCache: DataResponse<string> = {
     result: "Test",
     source: DataSource.HttpRequest
 };
+const ajaxResponse: AxiosResponse<string> = {
+    status: 200,
+    data: "payload",
+    statusText: "Good",
+    config: {},
+    headers: {}
+};
 describe("DataAccessSingleton", () => {
     let das: DataAccessSingleton;
     let request: AjaxRequest;
     beforeEach(() => {
-        das = new DataAccessSingleton();
+        das = new DataAccessSingleton(DATABASE_NAME);
         das.addInPersistentStore = jest.fn().mockRejectedValue("test");
         das.getPersistentStoreData = jest.fn().mockRejectedValue("test");
         das.deleteFromPersistentStorage = jest.fn().mockRejectedValue("test");
@@ -197,7 +206,7 @@ describe("DataAccessSingleton", () => {
         let source: DataSource;
         let cacheEntry: CachedData<string> | undefined;
         beforeEach(() => {
-            das.fetchWithAjax = jest.fn().mockResolvedValue(cacheDataNotExpired);
+            das.fetchWithAjax = jest.fn().mockResolvedValue(ajaxResponse);
             das.saveCache = jest.fn();
         });
         describe("when cacheEntry is undefined", () => {

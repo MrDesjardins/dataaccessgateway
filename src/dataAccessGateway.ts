@@ -167,10 +167,14 @@ export class DataAccessSingleton implements IDataAccessSingleton {
     public fetchAndSaveInCacheIfExpired<T>(request: AjaxRequest, source: DataSource, cacheEntry?: CachedData<T> | undefined): Promise<DataResponse<T>> {
         if (cacheEntry === undefined || (new Date()).getTime() > new Date(cacheEntry.expirationDateTime).getTime()) {
             return this.fetchWithAjax<T>(request).then((value: AxiosResponse<T>) => {
-                return this.saveCache(request, {
-                    source: DataSource.HttpRequest,
-                    result: value.data
-                });
+                if (value.status >= 200 && value.status <= 399) {
+                    return this.saveCache(request, {
+                        source: DataSource.HttpRequest,
+                        result: value.data
+                    });
+                } else {
+                    return Promise.reject("Cannot cache request that are not in the range of 200 or in the range of 300.");
+                }
             });
         } else {
             return Promise.resolve({
