@@ -1,7 +1,6 @@
 import { AxiosResponse } from "../node_modules/axios";
-import { DataAccessSingleton, DeleteCacheOptions, DataAccessIndexDbDatabase } from "../src/dataAccessGateway";
-import { AjaxRequest, CachedData, DataResponse, DataSource, CacheDataWithId } from "../src/model";
-import { Dexie } from "dexie";
+import { DataAccessIndexDbDatabase, DataAccessSingleton, DataAccessSingletonOptions, DeleteCacheOptions } from "../src/dataAccessGateway";
+import { AjaxRequest, CacheConfiguration, CachedData, DataResponse, DataSource } from "../src/model";
 const DATABASE_NAME = "Test";
 interface FakeObject {
     id: string;
@@ -78,6 +77,22 @@ describe("DataAccessSingleton", () => {
             headers: {}
         };
     });
+    describe("getInstance", () => {
+        describe("when called twice with the same name", () => {
+            it("returns the same instance", () => {
+                const instance1 = DataAccessSingleton.getInstance("test");
+                const instance2 = DataAccessSingleton.getInstance("test");
+                expect(instance1).toBe(instance2);
+            });
+        });
+        describe("when called twice with the same name", () => {
+            it("returns the same instance", () => { // This is until we support many instances
+                const instance1 = DataAccessSingleton.getInstance("1");
+                const instance2 = DataAccessSingleton.getInstance("2");
+                expect(instance1).toBe(instance2);
+            });
+        });
+    });
     describe("setConfiguration", () => {
         describe("empty options", () => {
             it("uses default option", () => {
@@ -92,12 +107,167 @@ describe("DataAccessSingleton", () => {
             });
         });
         describe("with version provided", () => {
+            let options: Partial<DataAccessSingletonOptions>;
             beforeEach(() => {
                 das.openIndexDb.changeVersion = jest.fn();
+                options = { version: 100 };
             });
             it("change the indexdb version", () => {
-                das.setConfiguration({ version: 100 });
+                das.setConfiguration(options);
                 expect(das.openIndexDb.changeVersion).toHaveBeenCalledTimes(1);
+            });
+            describe("when changeVersion fail", () => {
+                beforeEach(() => {
+                    options.logError = jest.fn();
+                    das.openIndexDb = {
+                        changeVersion: () => {
+                            throw Error("Err");
+                        }
+                    } as any;
+                });
+                it("logs the error", () => {
+                    das.setConfiguration(options);
+                    expect(options.logError).toHaveBeenCalledTimes(1);
+                });
+            });
+        });
+    });
+
+    describe("setDefaultRequestId", () => {
+        let request: AjaxRequest;
+        beforeEach(() => {
+            request = {
+                request: {
+                    url: "http://request"
+                }
+            };
+        });
+        describe("when has an id ", () => {
+            beforeEach(() => {
+                request = {
+                    id: "MyId",
+                    request: {
+                        url: "http://request"
+                    }
+                };
+            });
+            it("keeps the id", () => {
+                das.setDefaultRequestId(request);
+                expect(request.id).toBe("MyId");
+            });
+        });
+        describe("when does NOT have an id ", () => {
+            beforeEach(() => {
+                request = {
+                    id: undefined,
+                    request: {
+                        url: "http://request"
+                    }
+                };
+            });
+            describe("and request URL is undefined ", () => {
+                beforeEach(() => {
+                    request.request.url = undefined;
+                });
+                it("sets an empty id", () => {
+                    das.setDefaultRequestId(request);
+                    expect(request.id).toBe("");
+                });
+            });
+            describe("and request URL is NOT undefined ", () => {
+                beforeEach(() => {
+                    request.request.url = "http://test.com";
+                });
+                it("uses the URL has the id", () => {
+                    das.setDefaultRequestId(request);
+                    expect(request.id).toBe("http://test.com");
+                });
+            });
+        });
+    });
+
+    describe("setDefaultCache", () => {
+        beforeEach(() => {
+            request = {
+                request: {
+                }
+            };
+        });
+        describe("when NO memory cache defined", () => {
+            beforeEach(() => {
+                request.memoryCache = undefined;
+            });
+            describe("when cache mandatory", () => {
+                beforeEach(() => {
+                    das.options.isCacheMandatoryIfEnabled = true;
+                });
+                it("sets the default cache", () => {
+                    das.setDefaultCache(request);
+                    expect(request.memoryCache).toBeDefined();
+                });
+            });
+            describe("when cache NOT mandatory", () => {
+                beforeEach(() => {
+                    das.options.isCacheMandatoryIfEnabled = false;
+                });
+                it("does NOT sets the default cache", () => {
+                    das.setDefaultCache(request);
+                    expect(request.memoryCache).toBeUndefined();
+                });
+            });
+            describe("when memory cache defined", () => {
+                let memoryCache: CacheConfiguration;
+                beforeEach(() => {
+                    memoryCache = { lifespanInSeconds: 9876 };
+                    request.memoryCache = memoryCache;
+                });
+                it("does NOT sets the default cache", () => {
+                    das.setDefaultCache(request);
+                    expect(request.memoryCache).toBe(memoryCache);
+                });
+            });
+        });
+    });
+
+    describe("setDefaultFastCache", () => {
+        beforeEach(() => {
+            request = {
+                request: {
+                }
+            };
+        });
+        describe("when NO persistent cache defined", () => {
+            beforeEach(() => {
+                request.persistentCache = undefined;
+            });
+            describe("when cache mandatory", () => {
+                beforeEach(() => {
+                    das.options.isCacheMandatoryIfEnabled = true;
+                });
+                it("sets the default cache", () => {
+                    das.setDefaultFastCache(request);
+                    expect(request.persistentCache).toBeDefined();
+                });
+            });
+            describe("when cache NOT mandatory", () => {
+                beforeEach(() => {
+                    das.options.isCacheMandatoryIfEnabled = false;
+                });
+                it("does NOT sets the default cache", () => {
+                    das.setDefaultFastCache(request);
+                    expect(request.persistentCache).toBeUndefined();
+                });
+            });
+            describe("when persistent cache defined", () => {
+                let fastCache: CacheConfiguration;
+                beforeEach(() => {
+                    fastCache = { lifespanInSeconds: 9876 };
+                    request.persistentCache = fastCache;
+                });
+                it("does NOT sets the default cache", () => {
+                    das.setDefaultFastCache(request);
+                    expect(request.persistentCache).toBe(fastCache);
+                });
             });
         });
     });
