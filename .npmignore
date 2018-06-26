@@ -1,7 +1,10 @@
 src
 test
 tsconfig.json
-webpack.config.js
+webpack.common.js
+webpack.dev.js
+webpack.prod.js
 coverage
 images
 .travis.yml
+node_modules

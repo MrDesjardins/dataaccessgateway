@@ -47,7 +47,8 @@ export interface DataResponse<T> {
 export enum DataAction {
     Save = "Save",
     Fetch = "Fetch",
-    Delete = "Delete"
+    Delete = "Delete",
+    System = "System"
 }
 export interface LogBase {
     source: DataSource;

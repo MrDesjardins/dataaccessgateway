@@ -83,7 +83,11 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         if (options !== undefined) {
             this.options = { ...this.DefaultOptions, ...options };
             if (options.version !== undefined) {
-                this.openIndexDb.changeVersion(options.version);
+                try {
+                    this.openIndexDb.changeVersion(options.version);
+                } catch (e) {
+                    this.options.logError({ source: DataSource.PersistentStorageCache, action: DataAction.System, error: e });
+                }
             }
         }
     }
@@ -254,23 +258,21 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         if (this.options.isCacheEnabled === false || request.persistentCache === undefined) {
             return Promise.resolve(undefined);
         }
-        return this.getPersistentStoreData(request.id!).then((persistentStorageValue: CachedData<{}> | undefined) => {
-            if (persistentStorageValue !== undefined) {
-                const localStorageCacheEntry = persistentStorageValue as CachedData<T>;
-                if (new Date().getTime() > (new Date(localStorageCacheEntry.expirationDateTime)).getTime()) {
-                    this.deleteFromPersistentStorage(request.id!);
-                } else {
-                    return Promise.resolve({
-                        source: DataSource.PersistentStorageCache,
-                        result: localStorageCacheEntry.payload
-                    });
+        return this.getPersistentStoreData(request.id!)
+            .then((persistentStorageValue: CachedData<{}> | undefined) => {
+                if (persistentStorageValue !== undefined) {
+                    const localStorageCacheEntry = persistentStorageValue as CachedData<T>;
+                    if (new Date().getTime() > (new Date(localStorageCacheEntry.expirationDateTime)).getTime()) {
+                        this.deleteFromPersistentStorage(request.id!);
+                    } else {
+                        return Promise.resolve({
+                            source: DataSource.PersistentStorageCache,
+                            result: localStorageCacheEntry.payload
+                        });
+                    }
                 }
-            }
-            return Promise.resolve(undefined);
-        }).catch((reason: any) => {
-            this.options.logError({ error: reason, source: DataSource.PersistentStorageCache, action: DataAction.Fetch });
-            throw reason;
-        });
+                return Promise.resolve(undefined);
+            });
     }
 
     public fetchWithAjax<T>(request: AjaxRequest): AxiosPromise<T> {
@@ -317,13 +319,16 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         }));
     }
 
-    public addInPersistentStore<T>(id: string, cacheData: CachedData<T>): void {
+    public async addInPersistentStore<T>(id: string, cacheData: CachedData<T>): Promise<string> {
         this.options.logInfo({ id: id, source: DataSource.PersistentStorageCache, action: DataAction.Save });
-        this.openIndexDb.transaction("rw", this.openIndexDb.data, async () => {
-            return this.openIndexDb.data.put({ id: id, ...cacheData });
-        }).catch((reason) => {
+        try {
+            return this.openIndexDb.transaction("rw", this.openIndexDb.data, async () => {
+                return this.openIndexDb.data.put({ id: id, ...cacheData });
+            });
+        } catch (reason) {
             this.options.logError({ error: reason, source: DataSource.PersistentStorageCache, action: DataAction.Save });
-        });
+            throw reason;
+        }
     }
     public getMemoryStoreData<T>(id: string): CachedData<T> | undefined {
         const cacheValue = this.cachedResponse.get(id);
@@ -333,13 +338,22 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         return JSON.parse(cacheValue) as CachedData<T>;
     }
     public async getPersistentStoreData<T>(id: string): Promise<CacheDataWithId<T> | undefined> {
-        return this.openIndexDb.data.get(id);
+        try {
+            return this.openIndexDb.data.get(id);
+        }
+        catch (reason) {
+            this.options.logError({ error: reason, source: DataSource.PersistentStorageCache, action: DataAction.Fetch });
+            throw reason;
+        }
     }
 
-    public deleteFromPersistentStorage(id: string): void {
-        this.openIndexDb.data.delete(id).catch((reason) => {
+    public async deleteFromPersistentStorage(id: string): Promise<void> {
+        try {
+            return this.openIndexDb.data.delete(id);
+        } catch (reason) {
             this.options.logError({ error: reason, source: DataSource.PersistentStorageCache, action: DataAction.Delete });
-        });
+            throw reason;
+        }
     }
 
     public deleteDataFromCache(id: string, options?: DeleteCacheOptions): void {
