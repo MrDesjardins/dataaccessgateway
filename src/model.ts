@@ -1,4 +1,4 @@
-import { AxiosRequestConfig, } from "axios";
+import { AxiosRequestConfig } from "axios";
 
 export interface CacheConfiguration {
     lifespanInSeconds: number;
@@ -42,4 +42,20 @@ export enum DataSource {
 export interface DataResponse<T> {
     source: DataSource;
     result: T;
+}
+
+export enum DataAction {
+    Save = "Save",
+    Fetch = "Fetch",
+    Delete = "Delete"
+}
+export interface LogBase {
+    source: DataSource;
+    action: DataAction;
+}
+export interface LogError extends LogBase {
+    error: any;
+}
+export interface LogInfo extends LogBase {
+    id: string;
 }

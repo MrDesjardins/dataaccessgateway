@@ -1,6 +1,6 @@
 {
   "name": "dataaccessgateway",
-  "version": "0.0.13",
+  "version": "0.0.16",
   "description": "A simple library that cache in two different levels HTTP requests",
   "repository": {
     "type": "git",
@@ -12,8 +12,9 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "webpack --env.production",
-    "builddev": "node_modules/typescript/bin/tsc",
+    "build": "webpack --config webpack.prod.js --env.production",
+    "builddev": "webpack --config webpack.dev.js --env.development",
+    "builddtsc": "node_modules/typescript/bin/tsc",
     "test": "node_modules/jest-cli/bin/jest.js",
     "testdev": "node_modules/jest-cli/bin/jest.js --watch",
     "coverage": "node_modules/jest-cli/bin/jest.js --coverage",
@@ -51,7 +52,8 @@
     "typescript": "^2.8.3",
     "uglifyjs-webpack-plugin": "^1.2.5",
     "webpack": "^4.6.0",
-    "webpack-cli": "^2.0.15"
+    "webpack-cli": "^2.0.15",
+    "webpack-merge": "^4.1.2"
   },
   "jest": {
     "globals": {
