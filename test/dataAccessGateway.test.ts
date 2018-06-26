@@ -1,6 +1,7 @@
 import { AxiosResponse } from "../node_modules/axios";
-import { DataAccessSingleton, DeleteCacheOptions } from "../src/dataAccessGateway";
-import { AjaxRequest, CachedData, DataResponse, DataSource } from "../src/model";
+import { DataAccessSingleton, DeleteCacheOptions, DataAccessIndexDbDatabase } from "../src/dataAccessGateway";
+import { AjaxRequest, CachedData, DataResponse, DataSource, CacheDataWithId } from "../src/model";
+import { Dexie } from "dexie";
 const DATABASE_NAME = "Test";
 interface FakeObject {
     id: string;
@@ -18,6 +19,42 @@ const dataResponseFromCache: DataResponse<string> = {
     result: "Test",
     source: DataSource.HttpRequest
 };
+describe("DataAccessIndexDbDatabase", () => {
+    let didb: DataAccessIndexDbDatabase;
+    beforeEach(() => {
+        didb = new DataAccessIndexDbDatabase("");
+    });
+    describe("changeVersion", () => {
+        describe("when version change", () => {
+            it("calls dexie version function", () => {
+
+
+            });
+        });
+    });
+    describe("dropTable", () => {
+        describe("when data is definFed", () => {
+            beforeEach(() => {
+                didb.data = { clear: () => { } } as any;
+                (didb as any).data.clear = jest.fn();
+            });
+            it("clears data", async () => {
+                expect.assertions(1);
+                await didb.dropTable();
+                expect(didb.data.clear as any).toHaveBeenCalledTimes(1);
+            });
+        });
+        describe("when data is undefined", () => {
+            beforeEach(() => {
+                didb.data = undefined;
+            });
+            it("rejects the promise", async () => {
+                expect.assertions(1);
+                didb.dropTable().catch(e => expect(e).toBeDefined());
+            });
+        });
+    });
+});
 describe("DataAccessSingleton", () => {
     let das: DataAccessSingleton;
     let request: AjaxRequest;
