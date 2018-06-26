@@ -46,7 +46,7 @@
     "clean-webpack-plugin": "^0.1.19",
     "coveralls": "^3.0.0",
     "jest": "^22.4.3",
-    "jest-cli": "^22.4.3",
+    "jest-cli": "^22.4.4",
     "ts-jest": "^22.4.4",
     "ts-loader": "^4.2.0",
     "typescript": "^2.8.3",
