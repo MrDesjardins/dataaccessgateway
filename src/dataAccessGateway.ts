@@ -7,13 +7,6 @@ export class DataAccessIndexDbDatabase extends Dexie {
 
     public constructor(databaseName: string) {
         super(databaseName);
-        this.changeVersion(1);
-    }
-
-    public changeVersion(version: number): void {
-        this.version(version).stores({
-            data: "id"
-        });
     }
 
     public dropTable(): Promise<void> {
@@ -27,7 +20,6 @@ export interface DataAccessSingletonOptions {
     isCacheEnabled: boolean;
     isCacheMandatoryIfEnabled: boolean;
     defaultLifeSpanInSeconds: number;
-    version: number;
     logError: (error: LogError) => void;
     logInfo: (info: LogInfo) => void;
 }
@@ -59,7 +51,6 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         isCacheEnabled: true,
         isCacheMandatoryIfEnabled: true,
         defaultLifeSpanInSeconds: 5 * 60,
-        version: 1,
         logError: () => { /*Nothing*/ },
         logInfo: () => { /*Nothing*/ },
     };
@@ -82,13 +73,6 @@ export class DataAccessSingleton implements IDataAccessSingleton {
     public setConfiguration(options?: Partial<DataAccessSingletonOptions>): void {
         if (options !== undefined) {
             this.options = { ...this.DefaultOptions, ...options };
-            if (options.version !== undefined) {
-                try {
-                    this.openIndexDb.changeVersion(options.version);
-                } catch (e) {
-                    this.options.logError({ source: DataSource.PersistentStorageCache, action: DataAction.System, error: e });
-                }
-            }
         }
     }
 

@@ -1,5 +1,5 @@
 import { AxiosResponse } from "../node_modules/axios";
-import { DataAccessIndexDbDatabase, DataAccessSingleton, DataAccessSingletonOptions, DeleteCacheOptions } from "../src/dataAccessGateway";
+import { DataAccessIndexDbDatabase, DataAccessSingleton, DeleteCacheOptions } from "../src/dataAccessGateway";
 import { AjaxRequest, CacheConfiguration, CachedData, DataResponse, DataSource } from "../src/model";
 const DATABASE_NAME = "Test";
 interface FakeObject {
@@ -22,14 +22,6 @@ describe("DataAccessIndexDbDatabase", () => {
     let didb: DataAccessIndexDbDatabase;
     beforeEach(() => {
         didb = new DataAccessIndexDbDatabase("");
-    });
-    describe("changeVersion", () => {
-        describe("when version change", () => {
-            it("calls dexie version function", () => {
-
-
-            });
-        });
     });
     describe("dropTable", () => {
         describe("when data is definFed", () => {
@@ -104,31 +96,6 @@ describe("DataAccessSingleton", () => {
             it("uses default value for unspecified options", () => {
                 das.setConfiguration({ isCacheEnabled: false });
                 expect(das.options.defaultLifeSpanInSeconds).toBe(das.DefaultOptions.defaultLifeSpanInSeconds);
-            });
-        });
-        describe("with version provided", () => {
-            let options: Partial<DataAccessSingletonOptions>;
-            beforeEach(() => {
-                das.openIndexDb.changeVersion = jest.fn();
-                options = { version: 100 };
-            });
-            it("change the indexdb version", () => {
-                das.setConfiguration(options);
-                expect(das.openIndexDb.changeVersion).toHaveBeenCalledTimes(1);
-            });
-            describe("when changeVersion fail", () => {
-                beforeEach(() => {
-                    options.logError = jest.fn();
-                    das.openIndexDb = {
-                        changeVersion: () => {
-                            throw Error("Err");
-                        }
-                    } as any;
-                });
-                it("logs the error", () => {
-                    das.setConfiguration(options);
-                    expect(options.logError).toHaveBeenCalledTimes(1);
-                });
             });
         });
     });
