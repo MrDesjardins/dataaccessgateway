@@ -1,6 +1,6 @@
 {
   "name": "dataaccessgateway",
-  "version": "0.0.18",
+  "version": "0.0.19",
   "description": "A simple library that cache in two different levels HTTP requests",
   "repository": {
     "type": "git",
@@ -34,7 +34,7 @@
   },
   "license": "MIT",
   "dependencies": {
-    "dexie": "2.0.4"
+    "dexie": "2.0.3"
   },
   "peerDependencies": {
     "axios": "0.18.0"

@@ -7,6 +7,9 @@ export class DataAccessIndexDbDatabase extends Dexie {
 
     public constructor(databaseName: string) {
         super(databaseName);
+        this.version(1).stores({
+            data: "id"
+        });
     }
 
     public dropTable(): Promise<void> {
