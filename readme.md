@@ -5,7 +5,7 @@
 [![npm version](https://badge.fury.io/js/dataaccessgateway.svg)](https://badge.fury.io/js/dataaccessgateway)
 
 ## Goal
-The goal of this library is to provide a tiny abstraction to cache data when performing API calls. It eases the request by caching the data in memory and/or in the browser memory with few options. The cache works with two levels of cache. The first one is a memory cache and the second use IndexDB as a persistent cache.
+The goal of this library is to provide a tiny abstraction to cache data when performing remote HTTP(s) API calls. It eases the request by caching the data in memory and/or in the browser memory with a limited set of options. The cache works with two levels of cache: the first one is a memory cache and the second use IndexDB as a persistent cache.
 
 ## Why?
 
