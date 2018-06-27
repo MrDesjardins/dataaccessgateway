@@ -56,6 +56,9 @@
     "webpack-merge": "^4.1.2"
   },
   "jest": {
+    "setupFiles": [
+      "./test/setupTests.ts"
+    ],
     "globals": {
       "__VERSION__": "test"
     },

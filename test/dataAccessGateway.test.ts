@@ -1,4 +1,4 @@
-import { AxiosResponse } from "../node_modules/axios";
+import { AxiosResponse } from "axios";
 import { DataAccessIndexDbDatabase, DataAccessSingleton, DeleteCacheOptions } from "../src/dataAccessGateway";
 import { AjaxRequest, CacheConfiguration, CachedData, DataResponse, DataSource } from "../src/model";
 const DATABASE_NAME = "Test";
