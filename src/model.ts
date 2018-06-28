@@ -35,9 +35,10 @@ export interface OnGoingAjaxRequest {
     promise: Promise<any>;
 }
 export enum DataSource {
-    HttpRequest,
-    MemoryCache,
-    PersistentStorageCache
+    HttpRequest = "HttpRequest",
+    MemoryCache = "MemoryCache",
+    PersistentStorageCache = "PersistentStorageCache",
+    System = "System",
 }
 export interface DataResponse<T> {
     source: DataSource;
@@ -47,8 +48,12 @@ export interface DataResponse<T> {
 export enum DataAction {
     Save = "Save",
     Fetch = "Fetch",
+    Use = "Use",
     Delete = "Delete",
-    System = "System"
+    WaitingOnGoingRequest = "WaitingOnGoingRequest",
+    AddFromOnGoingRequest = "AddFromOnGoingRequest",
+    RemoveFromOnGoingRequest = "RemoveFromOnGoingRequest",
+    System = "System",
 }
 export interface LogBase {
     source: DataSource;
