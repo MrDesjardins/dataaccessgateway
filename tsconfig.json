@@ -9,7 +9,8 @@
         "downlevelIteration": true,
         "forceConsistentCasingInFileNames": true,
         "lib": [
-            "es6"
+            "es6",
+            "dom"
         ],
         "module": "es6",
         "target": "es5",
