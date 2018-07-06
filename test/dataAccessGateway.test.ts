@@ -405,6 +405,7 @@ describe("DataAccessSingleton", () => {
         describe("when cacheEntry is undefined", () => {
             beforeEach(() => {
                 cacheEntry = undefined;
+                ajaxResponse.status = 500;
             });
             it("fetches with an AJAX call the data remotely", async () => {
                 try {
