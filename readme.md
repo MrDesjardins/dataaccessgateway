@@ -102,5 +102,10 @@ If you want to change the 5 minutes default for anything else you can do it with
 ``` 
 DataAccessGateway("AppName").setConfiguration({ defaultLifeSpanInSeconds: 120 });
 ``` 
+
 ## Todo List:
 - Increase Unit Tests
+- Add performance loginfo
+
+## Chrome Extension
+There is an [open-source Chrome extension](https://github.com/MrDesjardins/dataaccessgatewaychromeextension) that allows to get insight from the library.
