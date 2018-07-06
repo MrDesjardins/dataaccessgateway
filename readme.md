@@ -38,7 +38,7 @@ This mode work well in a system where you have multiple life cycle loops very fa
 
 ### Fetch Web
 
-The fetch web is a side function that allows to always returns the response from the web. However, it still stores the result into the caches. It allows to be 100% to get the result from the web while allowing other calls that leverage the cache to use the response. The function is connected to the `logInfo` allowing to keep track of the source of the information.
+The fetch web is a side function that allows to always returns the response from the web. However, it still stores the result into the caches. It allows to be 100% to get the result from the web while allowing other calls that leverage the cache to use the response. It also benefits of the on-going request feature which avoid multiple identical request to be performed at the same time reducing duplicate request. The function is connected to the `logInfo` allowing to keep track of the source of the information.
 
 ![alt text](https://github.com/MrDesjardins/dataaccessgateway/raw/master/images/fetchWebFlowDiagram.png "Fetch Web Flow Diagram")
 
@@ -77,7 +77,7 @@ const promiseResult = DataAccessGateway("AppName").fetchFast<YourEntityResponse>
 ``` 
 
 ### Custom key
-It's possible to define custom key if the URL is not unique enough by adding an `id`.
+It's possible to define a custom key if the URL is not unique enough by adding an `id`. The custom key is required when fetching with a same URL different data. That can happen when using POST to fetch data. By default, the library uses the URL as a unique identifier. The custom key gives you the flexibility to manually craft a unique key allowing the same URL to cache and to handle on-going Ajax call uniquely.
 ``` 
  DataAccessGateway("AppName").fetchFast<YourEntityResponse>({
                             id: "myUniqueKey",

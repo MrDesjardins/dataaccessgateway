@@ -95,6 +95,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
     }
 
     public fetchWeb<T>(request: AjaxRequest): Promise<DataResponse<T>> {
+        this.setDefaultRequestId(request); // Default values        
         return this.fetchAndSaveInCacheIfExpired<T>(request, DataSource.HttpRequest)
             .then((response: DataResponse<T>) => {
                 this.logInfo({ action: DataAction.Use, id: request.id!, source: DataSource.HttpRequest });

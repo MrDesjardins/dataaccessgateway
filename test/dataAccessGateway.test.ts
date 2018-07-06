@@ -65,7 +65,7 @@ describe("DataAccessSingleton", () => {
             }
         };
         ajaxResponse = {
-            status: 500,
+            status: 200,
             data: "payload",
             statusText: "Good",
             config: {},
@@ -977,6 +977,41 @@ describe("DataAccessSingleton", () => {
         });
     });
 
+    describe("fetchWeb", () => {
+        let request: AjaxRequest;
+        beforeEach(() => {
+            request = {
+                request: {
+                    url: "http://request"
+                }
+            };
+            das.setConfiguration({ isCacheEnabled: true });
+            das.setDefaultRequestId = jest.fn();
+            das.setDefaultCache = jest.fn();
+            das.fetchAndSaveInCacheIfExpired = jest.fn().mockResolvedValue(ajaxResponse);
+            das.tryMemoryCacheFetching = jest.fn().mockRejectedValue("test");
+        });
+        it("always call the default request id configuration", () => {
+            das.fetchWeb(request);
+            expect(das.setDefaultRequestId).toHaveBeenCalledTimes(1);
+        });
+        it("always call the fetch and save", () => {
+            das.fetchWeb(request);
+            expect(das.fetchAndSaveInCacheIfExpired).toHaveBeenCalledTimes(1);
+        });
+        it("never call the default cache", () => {
+            das.fetchWeb(request);
+            expect(das.setDefaultCache).toHaveBeenCalledTimes(0);
+        });
+        it("never call memory cache", () => {
+            das.fetchWeb(request);
+            expect(das.tryMemoryCacheFetching).toHaveBeenCalledTimes(0);
+        });
+        // fit("calls logInfo", () => {
+        //     das.fetchWeb(request);
+        //     expect(das.options.logInfo).toHaveBeenCalledTimes(1);
+        // });
+    });
     // describe("addInPersistentStore", () => {
     //     describe("when transaction is successful", () => {
     //         beforeEach(() => {
