@@ -40,11 +40,6 @@ export enum DataSource {
     PersistentStorageCache = "PersistentStorageCache",
     System = "System",
 }
-export interface DataResponse<T> {
-    source: DataSource;
-    result: T;
-}
-
 export enum DataAction {
     Save = "Save",
     Fetch = "Fetch",
@@ -55,6 +50,11 @@ export enum DataAction {
     RemoveFromOnGoingRequest = "RemoveFromOnGoingRequest",
     System = "System",
 }
+export interface DataResponse<T> {
+    source: DataSource;
+    result: T;
+}
+
 export interface LogBase {
     source: DataSource;
     action: DataAction;

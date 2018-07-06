@@ -36,6 +36,7 @@ export interface IDataAccessSingleton {
     setConfiguration(options?: Partial<DataAccessSingletonOptions>): void;
     fetchFresh<T>(request: AjaxRequest): Promise<DataResponse<T>>;
     fetchFast<T>(request: AjaxRequest): Promise<DataResponse<T>>
+    fetchWeb<T>(request: AjaxRequest): Promise<DataResponse<T>>;
     deleteDataFromCache(id: string): void;
 }
 
@@ -93,6 +94,13 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         }
     }
 
+    public fetchWeb<T>(request: AjaxRequest): Promise<DataResponse<T>> {
+        return this.fetchAndSaveInCacheIfExpired<T>(request, DataSource.HttpRequest)
+            .then((response: DataResponse<T>) => {
+                this.logInfo({ action: DataAction.Use, id: request.id!, source: DataSource.HttpRequest });
+                return response;
+            });
+    }
     /**
      * Go in the memory cache first, then the persisted cache. In all level of cache, if the data is outdated it will fetch and
      * wait the response to cache it and return it. It means that each time the data is obsolete that the fetch takes time but
