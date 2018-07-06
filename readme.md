@@ -17,7 +17,7 @@ The goal of this library is to provide a tiny abstraction to cache data when per
 
 ## Summary of the Two Modes
 
-There is two modes: two functions. This is simple as that. One focus on freshness and one focus on performance. In both case, by default the memory and persistent cache is enabled but you can turn off either of them.
+There is two modes: two functions. This is simple as that. One focus on freshness and one focus on performance. In both case, by default the memory and persistent cache is enabled but you can turn off either of them. On top of the two modes, there is a `fetchWeb` which returns the response from the web without having any reading from caches.
 
 ### Fetch Fresh 
 The first one is called `fetchFresh` and checks the memory cache first. If the data is not present, it will fall into the persistent cache. If not present or out-of-date, it does the HTTP request and fill the caches. In the case of obsolete data, the fallback to the API request might take times and hence this function doesn't guarantee to be efficient when the life of the data is out. 
@@ -34,6 +34,13 @@ Here is the flow from the actor request call up to when the data is coming back.
 ![alt text](https://github.com/MrDesjardins/dataaccessgateway/raw/master/images/fastFetchFlowDiagram.png "Fast Fetch Flow Diagram")
 
 This mode work well in a system where you have multiple life cycle loops very fast. For example, if you are using Redux. The first call might get expired data to display, but the query will be run and the cache will get updated. A next actions may get the data, again from the cache, but this time with the fresh data.
+
+
+### Fetch Web
+
+The fetch web is a side function that allows to always returns the response from the web. However, it still stores the result into the caches. It allows to be 100% to get the result from the web while allowing other calls that leverage the cache to use the response. The function is connected to the `logInfo` allowing to keep track of the source of the information.
+
+![alt text](https://github.com/MrDesjardins/dataaccessgateway/raw/master/images/fetchWebFlowDiagram.png "Fetch Web Flow Diagram")
 
 ## On-going HTTP Request
 
