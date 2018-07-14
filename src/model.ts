@@ -34,6 +34,18 @@ export interface OnGoingAjaxRequest {
     ajaxRequest: AjaxRequest;
     promise: Promise<any>;
 }
+
+export interface PerformanceTimeMarker {
+    startMs: number;
+    stopMs?: number;
+}
+export interface PerformanceRequestInsight {
+    fetch: PerformanceTimeMarker;
+    memoryCache?: PerformanceTimeMarker;
+    persistentStorageCache?: PerformanceTimeMarker;
+    httpRequest?: PerformanceTimeMarker;
+    dataSizeInBytes?: number;
+}
 export enum DataSource {
     HttpRequest = "HttpRequest",
     MemoryCache = "MemoryCache",
@@ -60,8 +72,11 @@ export interface LogBase {
     action: DataAction;
 }
 export interface LogError extends LogBase {
+    kind: "LogError";
     error: any;
 }
 export interface LogInfo extends LogBase {
+    kind: "LogInfo";
     id: string;
+    performanceInsight?: PerformanceRequestInsight;
 }
