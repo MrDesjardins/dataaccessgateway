@@ -1,6 +1,6 @@
 import { AxiosResponse } from "axios";
 import { DataAccessIndexDbDatabase, DataAccessSingleton, DeleteCacheOptions } from "../src/dataAccessGateway";
-import { AjaxRequest, CacheConfiguration, CachedData, DataResponse, DataSource, OnGoingAjaxRequest } from "../src/model";
+import { AjaxRequest, CacheConfiguration, CachedData, DataResponse, DataSource, OnGoingAjaxRequest, PerformanceRequestInsight } from "../src/model";
 import { getMockAjaxRequest, getMockOnGoingAjaxRequest, getPromiseRetarder, PromiseRetarder } from "./dataAccessGateway.mock";
 const DATABASE_NAME = "Test";
 interface FakeObject {
@@ -18,6 +18,11 @@ const cacheDataNotExpired: CachedData<string> = {
 const dataResponseFromCache: DataResponse<string> = {
     result: "Test",
     source: DataSource.HttpRequest
+};
+const defaultPerformanceInsight: PerformanceRequestInsight = {
+    fetch: {
+        startMs: 0
+    }
 };
 describe("DataAccessIndexDbDatabase", () => {
     let didb: DataAccessIndexDbDatabase;
@@ -51,9 +56,11 @@ describe("DataAccessSingleton", () => {
     let das: DataAccessSingleton;
     let request: AjaxRequest;
     let ajaxResponse: AxiosResponse<string>;
+    let spySetDefaultRequestId: jest.SpyInstance<(request: AjaxRequest) => void>;
 
     beforeEach(() => {
         das = new DataAccessSingleton(DATABASE_NAME);
+        spySetDefaultRequestId = jest.spyOn(das, "setDefaultRequestId");
         das.addInPersistentStore = jest.fn().mockRejectedValue("test");
         das.getPersistentStoreData = jest.fn().mockRejectedValue("test");
         das.deleteFromPersistentStorage = jest.fn().mockRejectedValue("test");
@@ -71,6 +78,9 @@ describe("DataAccessSingleton", () => {
             config: {},
             headers: {}
         };
+    });
+    afterEach(() => {
+        spySetDefaultRequestId.mockRestore();
     });
     describe("getInstance", () => {
         describe("when called twice with the same name", () => {
@@ -274,13 +284,12 @@ describe("DataAccessSingleton", () => {
         describe("when cache enabled", () => {
             beforeEach(() => {
                 das.setConfiguration({ isCacheEnabled: true });
-                das.setDefaultRequestId = jest.fn();
                 das.setDefaultFastCache = jest.fn();
                 das.fetchAndSaveInCacheIfExpired = jest.fn().mockResolvedValue(dataResponseFromCache);
             });
             it("always set default request id", () => {
                 das.fetchFast(request);
-                expect(das.setDefaultRequestId).toHaveBeenCalledTimes(1);
+                expect(spySetDefaultRequestId).toHaveBeenCalledTimes(1);
             });
             it("always set default fast cache option", () => {
                 das.fetchFast(request);
@@ -401,6 +410,7 @@ describe("DataAccessSingleton", () => {
         beforeEach(() => {
             das.fetchWithAjax = jest.fn().mockResolvedValue(ajaxResponse);
             das.saveCache = jest.fn();
+            request.id = "http://test";
         });
         describe("when cacheEntry is undefined", () => {
             beforeEach(() => {
@@ -560,7 +570,6 @@ describe("DataAccessSingleton", () => {
                 }
             };
             das.setConfiguration({ isCacheEnabled: true });
-            das.setDefaultRequestId = jest.fn();
             das.setDefaultCache = jest.fn();
             das.fetchAndSaveInCacheIfExpired = jest.fn();
             das.tryMemoryCacheFetching = jest.fn().mockRejectedValue("test");
@@ -570,7 +579,7 @@ describe("DataAccessSingleton", () => {
         });
         it("always call the default request id configuration", () => {
             das.fetchFresh(request);
-            expect(das.setDefaultRequestId).toHaveBeenCalledTimes(1);
+            expect(spySetDefaultRequestId).toHaveBeenCalledTimes(1);
         });
         it("always call the default cache", () => {
             das.fetchFresh(request);
@@ -619,6 +628,18 @@ describe("DataAccessSingleton", () => {
                 it("calls save cache", async () => {
                     await das.fetchFresh(request);
                     expect(das.saveCache).toHaveBeenCalledTimes(1);
+                });
+            });
+            describe("when tryPersistentStorageFetching fail", () => {
+                beforeEach(() => {
+                    das.tryPersistentStorageFetching = jest.fn().mockRejectedValue("Error");
+                    das.deletePerformanceInsight = jest.fn();
+                });
+                it("deletes performance insight", async () => {
+                    try {
+                        await das.fetchFresh(request);
+                    } catch { }
+                    expect(das.deletePerformanceInsight).toHaveBeenCalledTimes(1);
                 });
             });
         });
@@ -884,7 +905,7 @@ describe("DataAccessSingleton", () => {
         describe("when request is already on-going", () => {
             beforeEach(() => {
                 onGoingPromise = getMockOnGoingAjaxRequest(requestId, requestData);
-                das.onGoingRequest.set(requestId, onGoingPromise);
+                das.onGoingAjaxRequest.set(requestId, onGoingPromise);
             });
             it("returns the on-going promise", () => {
                 const result = das.fetchWithAjax(request);
@@ -898,7 +919,7 @@ describe("DataAccessSingleton", () => {
         describe("when not an already on-going request", () => {
             beforeEach(() => {
                 onGoingPromise = getMockOnGoingAjaxRequest(requestId, requestData);
-                das.onGoingRequest.clear();
+                das.onGoingAjaxRequest.clear();
             });
             it("performs the Ajax call", () => {
                 das.fetchWithAjax(request);
@@ -906,7 +927,7 @@ describe("DataAccessSingleton", () => {
             });
             it("adds a new on-going request", () => {
                 das.fetchWithAjax(request);
-                expect(das.onGoingRequest.size).toEqual(1);
+                expect(das.onGoingAjaxRequest.size).toEqual(1);
             });
             describe("when call is successful", () => {
                 let promiseNotFulfilled: PromiseRetarder;
@@ -919,7 +940,7 @@ describe("DataAccessSingleton", () => {
                     const promiseReturn = das.fetchWithAjax(request);
                     promiseNotFulfilled.resolveNow();
                     promiseReturn.then(() => {
-                        expect(das.onGoingRequest.size).toEqual(0);
+                        expect(das.onGoingAjaxRequest.size).toEqual(0);
                     });
                 });
                 it("returns the response", () => {
@@ -940,9 +961,9 @@ describe("DataAccessSingleton", () => {
                 it("removes the on-going request", () => {
                     const promiseReturn = das.fetchWithAjax(request);
                     promiseNotFulfilled.rejectNow();
-                    expect(das.onGoingRequest.size).toEqual(1);
+                    expect(das.onGoingAjaxRequest.size).toEqual(1);
                     promiseReturn.catch(() => {
-                        expect(das.onGoingRequest.size).toEqual(0);
+                        expect(das.onGoingAjaxRequest.size).toEqual(0);
                     });
                     expect.assertions(2);
                 });
@@ -968,13 +989,13 @@ describe("DataAccessSingleton", () => {
         });
     });
 
-    describe("deleteOnGoingRequest", () => {
+    describe("deleteonGoingAjaxRequest", () => {
         beforeEach(() => {
-            das.onGoingRequest.delete = jest.fn();
+            das.onGoingAjaxRequest.delete = jest.fn();
         });
         it("removes from on-going list", () => {
-            das.deleteOnGoingRequest("id");
-            expect(das.onGoingRequest.delete).toHaveBeenCalledTimes(1);
+            das.deleteOnGoingAjaxRequest("id");
+            expect(das.onGoingAjaxRequest.delete).toHaveBeenCalledTimes(1);
         });
     });
 
@@ -987,14 +1008,14 @@ describe("DataAccessSingleton", () => {
                 }
             };
             das.setConfiguration({ isCacheEnabled: true });
-            das.setDefaultRequestId = jest.fn();
             das.setDefaultCache = jest.fn();
+            das.deletePerformanceInsight = jest.fn();
             das.fetchAndSaveInCacheIfExpired = jest.fn().mockResolvedValue(ajaxResponse);
             das.tryMemoryCacheFetching = jest.fn().mockRejectedValue("test");
         });
         it("always call the default request id configuration", () => {
             das.fetchWeb(request);
-            expect(das.setDefaultRequestId).toHaveBeenCalledTimes(1);
+            expect(spySetDefaultRequestId).toHaveBeenCalledTimes(1);
         });
         it("always call the fetch and save", () => {
             das.fetchWeb(request);
@@ -1008,10 +1029,254 @@ describe("DataAccessSingleton", () => {
             das.fetchWeb(request);
             expect(das.tryMemoryCacheFetching).toHaveBeenCalledTimes(0);
         });
+        describe("when fail to fetch", () => {
+            beforeEach(() => {
+                das.fetchAndSaveInCacheIfExpired = jest.fn().mockRejectedValue("Error");
+            });
+            it("deletes performance insight", async () => {
+                try {
+                    await das.fetchWeb(request);
+                } catch { }
+                expect(das.deletePerformanceInsight).toHaveBeenCalledTimes(1);
+            });
+        });
         // fit("calls logInfo", () => {
         //     das.fetchWeb(request);
         //     expect(das.options.logInfo).toHaveBeenCalledTimes(1);
         // });
+    });
+
+    describe("startPerformanceInsight", () => {
+        beforeEach(() => {
+            das.getPerformanceInsight = jest.fn().mockReturnValue(defaultPerformanceInsight);
+        });
+        describe("insight is an id", () => {
+            let request: string;
+            beforeEach(() => {
+                request = "123";
+            });
+            it("calls getPerformanceInsight", () => {
+                das.startPerformanceInsight(request);
+                expect(das.getPerformanceInsight).toHaveBeenCalledTimes(1);
+            });
+        });
+        describe("insight is a Performance Request", () => {
+            let request: PerformanceRequestInsight;
+            beforeEach(() => {
+                request = defaultPerformanceInsight;
+            });
+            it("calls does not call getPerformanceInsight", () => {
+                das.startPerformanceInsight(request);
+                expect(das.getPerformanceInsight).toHaveBeenCalledTimes(0);
+            });
+        });
+        describe("sets http request", () => {
+            let request: PerformanceRequestInsight;
+            let source: DataSource | undefined;
+            beforeEach(() => {
+                request = defaultPerformanceInsight;
+            });
+            describe("when source is undefined", () => {
+                beforeEach(() => {
+                    source = undefined;
+                });
+                it("sets the overall fetch start time", () => {
+                    const ref = { ...defaultPerformanceInsight };
+                    const result = das.startPerformanceInsight(request, source);
+                    expect(result.fetch).not.toBe(ref.fetch);
+                });
+                it("has no stop time", () => {
+                    const ref = { ...defaultPerformanceInsight };
+                    const result = das.startPerformanceInsight(request, source);
+                    expect(result.fetch.stopMs).toBeUndefined();
+                });
+            });
+            describe("when source is HttpRequest", () => {
+                beforeEach(() => {
+                    source = DataSource.HttpRequest;
+                });
+                it("sets the httpRequest start time", () => {
+                    const ref = { ...defaultPerformanceInsight };
+                    const result = das.startPerformanceInsight(request, source);
+                    expect(result.httpRequest).not.toBe(ref.httpRequest);
+                });
+                it("has no stop time", () => {
+                    const ref = { ...defaultPerformanceInsight };
+                    const result = das.startPerformanceInsight(request, source);
+                    expect(result.httpRequest.stopMs).toBeUndefined();
+                });
+            });
+            describe("when source is MemoryCache", () => {
+                beforeEach(() => {
+                    source = DataSource.MemoryCache;
+                });
+                it("sets the memoryCache start time", () => {
+                    const ref = { ...defaultPerformanceInsight };
+                    const result = das.startPerformanceInsight(request, source);
+                    expect(result.memoryCache).not.toBe(ref.memoryCache);
+                });
+                it("has no stop time", () => {
+                    const ref = { ...defaultPerformanceInsight };
+                    const result = das.startPerformanceInsight(request, source);
+                    expect(result.memoryCache.stopMs).toBeUndefined();
+                });
+            });
+            describe("when source is PersistentStorageCache", () => {
+                beforeEach(() => {
+                    source = DataSource.PersistentStorageCache;
+                });
+                it("sets the persistentStorageCache start time", () => {
+                    const ref = { ...defaultPerformanceInsight };
+                    const result = das.startPerformanceInsight(request, source);
+                    expect(result.persistentStorageCache).not.toBe(ref.persistentStorageCache);
+                });
+                it("has no stop time", () => {
+                    const ref = { ...defaultPerformanceInsight };
+                    const result = das.startPerformanceInsight(request, source);
+                    expect(result.persistentStorageCache.stopMs).toBeUndefined();
+                });
+            });
+            describe("when source is System", () => {
+                beforeEach(() => {
+                    source = DataSource.System;
+                });
+                it("change nothing", () => {
+                    const ref = { ...defaultPerformanceInsight };
+                    const result = das.startPerformanceInsight(request, source);
+                    expect(result.persistentStorageCache).toBe(ref.persistentStorageCache);
+                    expect(result.memoryCache).toBe(ref.memoryCache);
+                    expect(result.httpRequest).toBe(ref.httpRequest);
+                });
+            });
+        });
+    });
+    describe("stopPerformanceInsight", () => {
+        beforeEach(() => {
+            das.getPerformanceInsight = jest.fn().mockReturnValue(defaultPerformanceInsight);
+        });
+        describe("insight is an id", () => {
+            let request: string;
+            beforeEach(() => {
+                request = "123";
+            });
+            it("calls getPerformanceInsight", () => {
+                das.stopPerformanceInsight(request);
+                expect(das.getPerformanceInsight).toHaveBeenCalledTimes(1);
+            });
+        });
+        describe("insight is a Performance Request", () => {
+            let request: PerformanceRequestInsight;
+            beforeEach(() => {
+                request = defaultPerformanceInsight;
+            });
+            it("calls does not call getPerformanceInsight", () => {
+                das.stopPerformanceInsight(request);
+                expect(das.getPerformanceInsight).toHaveBeenCalledTimes(0);
+            });
+        });
+        describe("sets http request", () => {
+            let request: PerformanceRequestInsight;
+            let source: DataSource | undefined;
+            beforeEach(() => {
+                request = defaultPerformanceInsight;
+            });
+            describe("when source is undefined", () => {
+                beforeEach(() => {
+                    source = undefined;
+                    request.fetch.startMs = 120;
+                });
+                it("keeps the same object for the performance mark", () => {
+                    const ref = { ...defaultPerformanceInsight };
+                    const result = das.stopPerformanceInsight(request, source);
+                    expect(result.fetch).toBe(ref.fetch);
+                });
+                it("does not change start time", () => {
+                    const ref = { ...defaultPerformanceInsight };
+                    const result = das.stopPerformanceInsight(request, source);
+                    expect(result.fetch.startMs).toEqual(ref.fetch.startMs);
+                });
+                it("has stop time", () => {
+                    const ref = { ...defaultPerformanceInsight };
+                    const result = das.stopPerformanceInsight(request, source);
+                    expect(result.fetch.stopMs).toBeDefined();
+                });
+            });
+            describe("when source is HttpRequest", () => {
+                beforeEach(() => {
+                    source = DataSource.HttpRequest;
+                    request.httpRequest.startMs = 220;
+                });
+                it("keeps the same object for the performance mark", () => {
+                    const ref = { ...defaultPerformanceInsight };
+                    const result = das.stopPerformanceInsight(request, source);
+                    expect(result.httpRequest).toBe(ref.httpRequest);
+                });
+                it("does not change start time", () => {
+                    const ref = { ...defaultPerformanceInsight };
+                    const result = das.stopPerformanceInsight(request, source);
+                    expect(result.httpRequest.startMs).toEqual(ref.httpRequest.startMs);
+                });
+                it("has stop time", () => {
+                    const ref = { ...defaultPerformanceInsight };
+                    const result = das.stopPerformanceInsight(request, source);
+                    expect(result.httpRequest.stopMs).toBeDefined();
+                });
+            });
+            describe("when source is MemoryCache", () => {
+                beforeEach(() => {
+                    source = DataSource.MemoryCache;
+                    request.httpRequest.startMs = 320;
+                });
+                it("keeps the same object for the performance mark", () => {
+                    const ref = { ...defaultPerformanceInsight };
+                    const result = das.stopPerformanceInsight(request, source);
+                    expect(result.memoryCache).toBe(ref.memoryCache);
+                });
+                it("does not change start time", () => {
+                    const ref = { ...defaultPerformanceInsight };
+                    const result = das.stopPerformanceInsight(request, source);
+                    expect(result.memoryCache.startMs).toEqual(ref.memoryCache.startMs);
+                });
+                it("has stop time", () => {
+                    const ref = { ...defaultPerformanceInsight };
+                    const result = das.stopPerformanceInsight(request, source);
+                    expect(result.memoryCache.stopMs).toBeDefined();
+                });
+            });
+            describe("when source is PersistentStorageCache", () => {
+                beforeEach(() => {
+                    source = DataSource.PersistentStorageCache;
+                    request.httpRequest.startMs = 420;
+                });
+                it("keeps the same object for the performance mark", () => {
+                    const ref = { ...defaultPerformanceInsight };
+                    const result = das.stopPerformanceInsight(request, source);
+                    expect(result.persistentStorageCache).toBe(ref.persistentStorageCache);
+                });
+                it("does not change start time", () => {
+                    const ref = { ...defaultPerformanceInsight };
+                    const result = das.stopPerformanceInsight(request, source);
+                    expect(result.persistentStorageCache.startMs).toEqual(ref.persistentStorageCache.startMs);
+                });
+                it("has stop time", () => {
+                    const ref = { ...defaultPerformanceInsight };
+                    const result = das.stopPerformanceInsight(request, source);
+                    expect(result.persistentStorageCache.stopMs).toBeDefined();
+                });
+            });
+            describe("when source is System", () => {
+                beforeEach(() => {
+                    source = DataSource.System;
+                });
+                it("change nothing", () => {
+                    const ref = { ...defaultPerformanceInsight };
+                    const result = das.stopPerformanceInsight(request, source);
+                    expect(result.persistentStorageCache).toBe(ref.persistentStorageCache);
+                    expect(result.memoryCache).toBe(ref.memoryCache);
+                    expect(result.httpRequest).toBe(ref.httpRequest);
+                });
+            });
+        });
     });
     // describe("addInPersistentStore", () => {
     //     describe("when transaction is successful", () => {
