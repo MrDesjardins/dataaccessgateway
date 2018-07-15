@@ -91,7 +91,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
     }
     public logError(error: Pick<LogError, Exclude<keyof LogError, "kind">>): void {
         const requestError: LogError = { ...error, kind: "LogError" };
-        this.options.logError({ ...error, kind: "LogError" });
+        this.options.logError(requestError);
         if (window) {
             window.postMessage({
                 source: "dataaccessgateway-agent",
