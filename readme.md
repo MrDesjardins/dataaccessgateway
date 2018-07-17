@@ -1,8 +1,8 @@
 # Data Access Gateway
 
-[![Build Status](https://travis-ci.org/MrDesjardins/dataaccessgateway.svg?branch=master)](https://travis-ci.org/MrDesjardins/dataaccessgateway)
-[![Coverage Status](https://coveralls.io/repos/github/MrDesjardins/dataaccessgateway/badge.svg?branch=master)](https://coveralls.io/github/MrDesjardins/dataaccessgateway?branch=master)
-[![npm version](https://badge.fury.io/js/dataaccessgateway.svg)](https://badge.fury.io/js/dataaccessgateway)
+[![Build Status](https://travis-ci.org/MrDesjardins/dataaccessgateway.svg?branch=master&t=1)](https://travis-ci.org/MrDesjardins/dataaccessgateway)
+[![Coverage Status](https://coveralls.io/repos/github/MrDesjardins/dataaccessgateway/badge.svg?branch=master)](https://coveralls.io/github/MrDesjardins/dataaccessgateway?branch=master&t=1)
+[![npm version](https://badge.fury.io/js/dataaccessgateway.svg?t=1)](https://badge.fury.io/js/dataaccessgateway)
 
 ## Goal
 The goal of this library is to provide a tiny abstraction to cache data when performing remote HTTP(s) API calls. It eases the request by caching the data in memory and/or in the browser memory with a limited set of options. The cache works with two levels of cache: the first one is a memory cache and the second use IndexDB as a persistent cache.
