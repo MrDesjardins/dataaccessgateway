@@ -95,7 +95,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         if (window) {
             window.postMessage({
                 source: "dataaccessgateway-agent",
-                payload: requestError
+                payload: { action: error.action, source: error.source, kind: "LogError" }
             }, "*");
         }
     }
