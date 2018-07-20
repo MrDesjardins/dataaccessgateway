@@ -70,6 +70,8 @@ export interface DataResponse<T> {
 export interface LogBase {
     source: DataSource;
     action: DataAction;
+    id: string;
+    performanceInsight?: PerformanceRequestInsight;
 }
 export interface LogError extends LogBase {
     kind: "LogError";
@@ -77,6 +79,4 @@ export interface LogError extends LogBase {
 }
 export interface LogInfo extends LogBase {
     kind: "LogInfo";
-    id: string;
-    performanceInsight?: PerformanceRequestInsight;
 }

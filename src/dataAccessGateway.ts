@@ -67,7 +67,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         try {
             this.openIndexDb = new DataAccessIndexDbDatabase(databaseName);
         } catch (e) {
-            this.logError({ action: DataAction.System, source: DataSource.System, error: e });
+            this.logError({ id: "", action: DataAction.System, source: DataSource.System, error: e });
         }
     }
 
@@ -95,7 +95,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         if (window) {
             window.postMessage({
                 source: "dataaccessgateway-agent",
-                payload: { action: error.action, source: error.source, kind: "LogError" }
+                payload: { action: error.action, source: error.source, kind: "LogError", id: error.id, performanceInsight: error.performanceInsight }
             }, "*");
         }
     }
@@ -151,7 +151,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                             }
                             return persistentCacheValue;
                         }).catch((reason: any) => {
-                            this.logError({ error: reason, source: DataSource.PersistentStorageCache, action: DataAction.Fetch });
+                            this.logError({ id: request.id!, error: reason, source: DataSource.PersistentStorageCache, action: DataAction.Fetch, performanceInsight: this.getPerformanceInsight(request.id!) });
                             return undefined;
                         });
                 } else {
@@ -295,7 +295,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 }
             } catch (error) {
                 this.stopPerformanceInsight(this.getPerformanceInsight(request.id!), DataSource.HttpRequest);
-                this.logError({ error: error, source: DataSource.HttpRequest, action: DataAction.Fetch });
+                this.logError({ id: request.id!, error: error, source: DataSource.HttpRequest, action: DataAction.Fetch, performanceInsight: this.getPerformanceInsight(request.id!) });
                 throw error;
             };
         } else {
@@ -391,7 +391,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             }
             return Promise.resolve(undefined);
         } catch (reason) {
-            this.logError({ error: reason, source: DataSource.PersistentStorageCache, action: DataAction.Use });
+            this.logError({ id: request.id!, error: reason, source: DataSource.PersistentStorageCache, action: DataAction.Use, performanceInsight: this.getPerformanceInsight(request.id!) });
             return undefined;
         }
     }
@@ -565,14 +565,14 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 const putPromise = this.openIndexDb.data.put({ id: id, ...cacheData }).then(() => {
                     this.logInfo({ id: id, source: DataSource.PersistentStorageCache, action: DataAction.Save, performanceInsight: this.getPerformanceInsight(id) });
                 }).catch((e) => {
-                    this.logError({ error: e, source: DataSource.PersistentStorageCache, action: DataAction.Save });
+                    this.logError({ id: id, error: e, source: DataSource.PersistentStorageCache, action: DataAction.Save, performanceInsight: this.getPerformanceInsight(id) });
                 });
                 return putPromise;
             }).catch(e => {
-                this.logError({ error: e, source: DataSource.PersistentStorageCache, action: DataAction.Save });
+                this.logError({ id: id, error: e, source: DataSource.PersistentStorageCache, action: DataAction.Save, performanceInsight: this.getPerformanceInsight(id) });
             });
         } catch (reason) {
-            this.logError({ error: reason, source: DataSource.PersistentStorageCache, action: DataAction.Save });
+            this.logError({ id: id, error: reason, source: DataSource.PersistentStorageCache, action: DataAction.Save, performanceInsight: this.getPerformanceInsight(id) });
         }
     }
     public getMemoryStoreData<T>(id: string): CachedData<T> | undefined {
@@ -597,7 +597,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             return resultPromise;
         }
         catch (reason) {
-            this.logError({ error: reason, source: DataSource.PersistentStorageCache, action: DataAction.Fetch });
+            this.stopPerformanceInsight(id, DataSource.PersistentStorageCache);
+            this.logError({ id: id, error: reason, source: DataSource.PersistentStorageCache, action: DataAction.Fetch, performanceInsight: this.getPerformanceInsight(id) });
             return undefined;
         }
     }
@@ -609,7 +610,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             }
             return this.openIndexDb.data.delete(id);
         } catch (reason) {
-            this.logError({ error: reason, source: DataSource.PersistentStorageCache, action: DataAction.Delete });
+            this.logError({ id: id, error: reason, source: DataSource.PersistentStorageCache, action: DataAction.Delete });
         }
     }
 
