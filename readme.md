@@ -9,11 +9,12 @@ The goal of this library is to provide a tiny abstraction to cache data when per
 
 ## Why?
 
-- Improve your performance by reducing waiting moment
-- Small footprint
+- Improve your performance by reducing waiting moment with memory cache
+- Remove simultaneous identical HTTP requests
+- Reduce loading time of your single-page application by loading previous date from the browser's Index DB
 - Craft your request with Axios' request object, hence nothing new to learn
 - Leverage Axios and Dexie libraries
-- Avoid duplicating HTTP calls that are still in progress
+- Small footprint
 
 ## Summary of the Two Modes
 
@@ -77,7 +78,7 @@ const promiseResult = DataAccessGateway("AppName").fetchFast<YourEntityResponse>
 ``` 
 
 ### Custom key
-It's possible to define a custom key if the URL is not unique enough by adding an `id`. The custom key is required when fetching with a same URL different data. That can happen when using POST to fetch data. By default, the library uses the URL as a unique identifier. The custom key gives you the flexibility to manually craft a unique key allowing the same URL to cache and to handle on-going Ajax call uniquely.
+It's possible to define a custom key if the URL is not unique enough by adding an `id`. The custom key is required when fetching with a same URL different data. That can happen when using POST to fetch data. By default, the library hashes the URL, urlBase, Params data and the method to generate unique identifier. The custom key gives you the flexibility to manually craft a unique key allowing the same URL to cache and to handle on-going Ajax call uniquely.
 ``` 
  DataAccessGateway("AppName").fetchFast<YourEntityResponse>({
                             id: "myUniqueKey",
@@ -98,14 +99,13 @@ DataAccessGateway("AppName").setConfiguration({ isCacheEnabled: true });
 ``` 
 
 ### Default cache time
-If you want to change the 5 minutes default for anything else you can do it with `setConfiguration`.
+If you want to change the `5 minutes` default for anything else you can do it with `setConfiguration`.
 ``` 
 DataAccessGateway("AppName").setConfiguration({ defaultLifeSpanInSeconds: 120 });
 ``` 
 
 ## Todo List:
 - Increase Unit Tests
-- Add performance loginfo
 
 ## Chrome Extension
 There is an [open-source Chrome extension](https://github.com/MrDesjardins/dataaccessgatewaychromeextension) that allows to get insight from the library.
