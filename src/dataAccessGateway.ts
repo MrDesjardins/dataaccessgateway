@@ -818,17 +818,17 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         }
     }
 
-    public deleteDataFromCache(request: AjaxRequestWithId, options?: DeleteCacheOptions): void {
-        this.setDefaultRequestId(request); // Default values
+    public deleteDataFromCache(request: AjaxRequest, options?: DeleteCacheOptions): void {
+        const requestWithId = this.setDefaultRequestId(request); // Default values
         if (options === undefined) {
-            this.deleteFromMemoryCache(request);
-            this.deleteFromPersistentStorage(request);
+            this.deleteFromMemoryCache(requestWithId);
+            this.deleteFromPersistentStorage(requestWithId);
         } else {
             if (options.memory !== undefined && options.memory === true) {
-                this.deleteFromMemoryCache(request);
+                this.deleteFromMemoryCache(requestWithId);
             }
             if (options.persistent !== undefined && options.persistent === true) {
-                this.deleteFromPersistentStorage(request);
+                this.deleteFromPersistentStorage(requestWithId);
             }
         }
     }

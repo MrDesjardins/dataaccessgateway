@@ -788,7 +788,7 @@ describe("DataAccessSingleton", () => {
             });
         });
         describe("deleteDataFromCache", () => {
-            let requestWithId: AjaxRequestWithId;
+            let requestWithId: AjaxRequest;
             beforeEach(() => {
                 requestWithId = { id: "1", request: getMockAxiosRequestConfig() };
             });
