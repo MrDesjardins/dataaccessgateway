@@ -269,54 +269,56 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         const memoryCacheEntry: CachedData<T> | undefined = this.getMemoryStoreData(requestTyped);
         if (memoryCacheEntry === undefined) {
             // Not in memory, check in long term storage
-            return this.getPersistentStoreData(requestTyped).then((persistentStorageValue: CachedData<{}> | undefined) => {
-                if (persistentStorageValue === undefined) {
-                    // Not in the persistent storage means we must fetch from API
-                    return this.fetchAndSaveInCacheIfExpired<T>(requestTyped, DataSource.HttpRequest).then(
-                        (response: DataResponse<T>) => {
-                            this.stopPerformanceInsight(requestTyped.id);
-                            this.logInfo({
-                                action: DataAction.Use,
-                                id: requestTyped.id,
-                                url: requestTyped.request.url!,
-                                source: DataSource.HttpRequest,
-                                performanceInsight: this.setDataSize(
-                                    this.getPerformanceInsight(requestTyped.id),
-                                    response.result
-                                )
-                            });
-                            return response;
+            return this.getPersistentStoreData(requestTyped).then(
+                (persistentStorageValue: CachedData<{}> | undefined) => {
+                    if (persistentStorageValue === undefined) {
+                        // Not in the persistent storage means we must fetch from API
+                        return this.fetchAndSaveInCacheIfExpired<T>(requestTyped, DataSource.HttpRequest).then(
+                            (response: DataResponse<T>) => {
+                                this.stopPerformanceInsight(requestTyped.id);
+                                this.logInfo({
+                                    action: DataAction.Use,
+                                    id: requestTyped.id,
+                                    url: requestTyped.request.url!,
+                                    source: DataSource.HttpRequest,
+                                    performanceInsight: this.setDataSize(
+                                        this.getPerformanceInsight(requestTyped.id),
+                                        response.result
+                                    )
+                                });
+                                return response;
+                            }
+                        );
+                    } else {
+                        // We have something from the persistent cache
+                        const persistentStorageEntry = persistentStorageValue as CachedData<T>;
+                        if (request.memoryCache !== undefined) {
+                            this.addInMemoryCache(requestTyped, persistentStorageEntry.payload);
                         }
-                    );
-                } else {
-                    // We have something from the persistent cache
-                    const persistentStorageEntry = persistentStorageValue as CachedData<T>;
-                    if (request.memoryCache !== undefined) {
-                        this.addInMemoryCache(requestTyped, persistentStorageEntry.payload);
+                        this.fetchAndSaveInCacheIfExpired<T>(
+                            requestTyped,
+                            DataSource.PersistentStorageCache,
+                            persistentStorageEntry
+                        ); // It's expired which mean we fetch to get fresh data HOWEVER, we will return the obsolete data to have a fast response
+                        // Return the persistent storage even if expired
+                        this.stopPerformanceInsight(requestTyped.id);
+                        this.logInfo({
+                            action: DataAction.Use,
+                            id: requestTyped.id,
+                            url: requestTyped.request.url!,
+                            source: DataSource.PersistentStorageCache,
+                            performanceInsight: this.setDataSize(
+                                this.getPerformanceInsight(requestTyped.id),
+                                persistentStorageEntry.payload
+                            )
+                        });
+                        return Promise.resolve({
+                            source: DataSource.PersistentStorageCache,
+                            result: persistentStorageEntry.payload
+                        });
                     }
-                    this.fetchAndSaveInCacheIfExpired<T>(
-                        requestTyped,
-                        DataSource.PersistentStorageCache,
-                        persistentStorageEntry
-                    ); // It's expired which mean we fetch to get fresh data HOWEVER, we will return the obsolete data to have a fast response
-                    // Return the persistent storage even if expired
-                    this.stopPerformanceInsight(requestTyped.id);
-                    this.logInfo({
-                        action: DataAction.Use,
-                        id: requestTyped.id,
-                        url: requestTyped.request.url!,
-                        source: DataSource.PersistentStorageCache,
-                        performanceInsight: this.setDataSize(
-                            this.getPerformanceInsight(requestTyped.id),
-                            persistentStorageEntry.payload
-                        )
-                    });
-                    return Promise.resolve({
-                        source: DataSource.PersistentStorageCache,
-                        result: persistentStorageEntry.payload
-                    });
                 }
-            });
+            );
         } else {
             this.fetchAndSaveInCacheIfExpired<T>(requestTyped, DataSource.MemoryCache, memoryCacheEntry); // We have something in the memory, but we might still want to fetch if expire for future requests
             this.stopPerformanceInsight(requestTyped.id, DataSource.MemoryCache);
@@ -382,14 +384,22 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             });
         }
     }
+    public generateId(request: AjaxRequest): string {
+        return hash.sha1(
+            JSON.stringify({
+                id: request.id,
+                params: request.request.params,
+                method: request.request.method,
+                url: request.request.url,
+                baseURL: request.request.baseURL,
+                data: request.request.data
+            })
+        );
+    }
 
     public setDefaultRequestId(request: AjaxRequest): AjaxRequestWithId {
         if (request.id === undefined) {
-            if (request.request.url === undefined) {
-                request.id = "";
-            } else {
-                request.id = hash.sha1(JSON.stringify(request.request));
-            }
+            request.id = this.generateId(request);
         }
         return { id: request.id, ...request };
     }
@@ -410,7 +420,10 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         }
     }
 
-    public saveCache<T>(request: AjaxRequestWithId, responseFromCacheOrAjax: DataResponse<T>): Promise<DataResponse<T>> {
+    public saveCache<T>(
+        request: AjaxRequestWithId,
+        responseFromCacheOrAjax: DataResponse<T>
+    ): Promise<DataResponse<T>> {
         // At the end, we check if we need to store in any of the cache
         if (request.memoryCache !== undefined) {
             this.addInMemoryCache(request, responseFromCacheOrAjax.result);

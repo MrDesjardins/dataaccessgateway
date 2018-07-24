@@ -157,10 +157,11 @@ describe("DataAccessSingleton", () => {
             describe("and request URL is undefined ", () => {
                 beforeEach(() => {
                     request.request.url = undefined;
+                    das.generateId = jest.fn();
                 });
                 it("sets an empty id", () => {
                     das.setDefaultRequestId(request);
-                    expect(request.id).toBe("");
+                    expect(das.generateId).toHaveBeenCalledTimes(1);
                 });
             });
             describe("and request URL is NOT undefined ", () => {
