@@ -23,6 +23,10 @@ export interface AjaxRequest {
     persistentCache?: CacheConfiguration;
 }
 
+export interface AjaxRequestWithId extends AjaxRequest {
+    id: string;
+}
+
 export interface CachedData<T> {
     expirationDateTime: Date;
     payload: T;
