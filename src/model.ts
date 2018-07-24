@@ -4,12 +4,12 @@ export interface CacheConfiguration {
     lifespanInSeconds: number;
 }
 export interface AjaxRequest {
-    /** 
-     * Identifier of the request. Need to be unique. If not provided, the request.url is used
+    /**
+     * Identifier of the request. Need to be unique. If not provided, the hash of request is used
      */
     id?: string;
     request: AxiosRequestConfig;
-    /** 
+    /**
      * The memory cache configuration. It contains the lifespan before ejecting the data from the cache.
      * When not defined is set to X seconds (see constant in the class)
      */
@@ -50,7 +50,7 @@ export enum DataSource {
     HttpRequest = "HttpRequest",
     MemoryCache = "MemoryCache",
     PersistentStorageCache = "PersistentStorageCache",
-    System = "System",
+    System = "System"
 }
 export enum DataAction {
     Save = "Save",
@@ -60,7 +60,7 @@ export enum DataAction {
     WaitingOnGoingRequest = "WaitingOnGoingRequest",
     AddFromOnGoingRequest = "AddFromOnGoingRequest",
     RemoveFromOnGoingRequest = "RemoveFromOnGoingRequest",
-    System = "System",
+    System = "System"
 }
 export interface DataResponse<T> {
     source: DataSource;
@@ -71,6 +71,7 @@ export interface LogBase {
     source: DataSource;
     action: DataAction;
     id: string;
+    url: string;
     performanceInsight?: PerformanceRequestInsight;
 }
 export interface LogError extends LogBase {

@@ -1,18 +1,19 @@
 import { AxiosResponse } from "axios";
+import hash from "object-hash";
 import { DataAccessIndexDbDatabase, DataAccessSingleton, DeleteCacheOptions } from "../src/dataAccessGateway";
 import { AjaxRequest, CacheConfiguration, CachedData, DataResponse, DataSource, OnGoingAjaxRequest, PerformanceRequestInsight } from "../src/model";
-import { getMockAjaxRequest, getMockOnGoingAjaxRequest, getPromiseRetarder, PromiseRetarder } from "./dataAccessGateway.mock";
+import { getMockAjaxRequest, getMockAxiosRequestConfig, getMockOnGoingAjaxRequest, getPromiseRetarder, PromiseRetarder } from "./dataAccessGateway.mock";
 const DATABASE_NAME = "Test";
 interface FakeObject {
     id: string;
     name: string;
 }
 const cacheDataExpired: CachedData<string> = {
-    expirationDateTime: new Date((new Date()).getTime() - 10000),
+    expirationDateTime: new Date(new Date().getTime() - 10000),
     payload: "Test"
 };
 const cacheDataNotExpired: CachedData<string> = {
-    expirationDateTime: new Date((new Date()).getTime() + 10000),
+    expirationDateTime: new Date(new Date().getTime() + 10000),
     payload: "Test"
 };
 const dataResponseFromCache: DataResponse<string> = {
@@ -32,7 +33,7 @@ describe("DataAccessIndexDbDatabase", () => {
     describe("dropTable", () => {
         describe("when data is definFed", () => {
             beforeEach(() => {
-                didb.data = { clear: () => { } } as any;
+                didb.data = { clear: () => {} } as any;
                 (didb as any).data.clear = jest.fn();
             });
             it("clears data", async () => {
@@ -91,7 +92,8 @@ describe("DataAccessSingleton", () => {
             });
         });
         describe("when called twice with the same name", () => {
-            it("returns the same instance", () => { // This is until we support many instances
+            it("returns the same instance", () => {
+                // This is until we support many instances
                 const instance1 = DataAccessSingleton.getInstance("1");
                 const instance2 = DataAccessSingleton.getInstance("2");
                 expect(instance1).toBe(instance2);
@@ -158,9 +160,9 @@ describe("DataAccessSingleton", () => {
                 beforeEach(() => {
                     request.request.url = "http://test.com";
                 });
-                it("uses the URL has the id", () => {
+                it("uses the whole request hashed has the id", () => {
                     das.setDefaultRequestId(request);
-                    expect(request.id).toBe("http://test.com");
+                    expect(request.id).toEqual(hash.sha1(JSON.stringify(request.request)));
                 });
             });
         });
@@ -169,8 +171,7 @@ describe("DataAccessSingleton", () => {
     describe("setDefaultCache", () => {
         beforeEach(() => {
             request = {
-                request: {
-                }
+                request: {}
             };
         });
         describe("when NO memory cache defined", () => {
@@ -212,8 +213,7 @@ describe("DataAccessSingleton", () => {
     describe("setDefaultFastCache", () => {
         beforeEach(() => {
             request = {
-                request: {
-                }
+                request: {}
             };
         });
         describe("when NO persistent cache defined", () => {
@@ -420,9 +420,7 @@ describe("DataAccessSingleton", () => {
             it("fetches with an AJAX call the data remotely", async () => {
                 try {
                     await das.fetchAndSaveInCacheIfExpired(request, source, cacheEntry);
-                } catch (e) {
-
-                }
+                } catch (e) {}
                 expect(das.saveCache).toHaveBeenCalledTimes(0);
             });
             describe("when status code is 200", () => {
@@ -457,9 +455,7 @@ describe("DataAccessSingleton", () => {
             it("fetches with an AJAX call the data remotely", async () => {
                 try {
                     await das.fetchAndSaveInCacheIfExpired(request, source, cacheEntry);
-                } catch (e) {
-
-                }
+                } catch (e) {}
                 expect(das.fetchWithAjax).toHaveBeenCalledTimes(1);
             });
             describe("when status code is 200", () => {
@@ -638,7 +634,7 @@ describe("DataAccessSingleton", () => {
                 it("deletes performance insight", async () => {
                     try {
                         await das.fetchFresh(request);
-                    } catch { }
+                    } catch {}
                     expect(das.deletePerformanceInsight).toHaveBeenCalledTimes(1);
                 });
             });
@@ -749,9 +745,7 @@ describe("DataAccessSingleton", () => {
                         try {
                             await das.tryPersistentStorageFetching(request);
                             expect(das.options.logError).toHaveBeenCalledTimes(1);
-                        } catch{
-
-                        }
+                        } catch {}
                     });
                 });
             });
@@ -783,23 +777,25 @@ describe("DataAccessSingleton", () => {
                 try {
                     await das.tryPersistentStorageFetching(request);
                     expect(das.options.logError).toHaveBeenCalledTimes(1);
-                } catch{
-
-                }
+                } catch {}
             });
         });
         describe("deleteDataFromCache", () => {
+            let request: AjaxRequest;
+            beforeEach(() => {
+                request = { id: "1", request: getMockAxiosRequestConfig() };
+            });
             describe("when no option", () => {
                 beforeEach(() => {
                     das.deleteFromMemoryCache = jest.fn().mockRejectedValue("test");
                     das.deleteFromPersistentStorage = jest.fn().mockRejectedValue("test");
                 });
                 it("removes it from the memory cache", () => {
-                    das.deleteDataFromCache("1");
+                    das.deleteDataFromCache(request);
                     expect(das.deleteFromMemoryCache).toHaveBeenCalledTimes(1);
                 });
                 it("removes it from the persistent cache", () => {
-                    das.deleteDataFromCache("1");
+                    das.deleteDataFromCache(request);
                     expect(das.deleteFromPersistentStorage).toHaveBeenCalledTimes(1);
                 });
             });
@@ -809,58 +805,58 @@ describe("DataAccessSingleton", () => {
                     das.deleteFromPersistentStorage = jest.fn().mockRejectedValue("test");
                 });
                 describe("when memory option only", () => {
-                    let options: DeleteCacheOptions
+                    let options: DeleteCacheOptions;
                     beforeEach(() => {
                         options = { memory: true };
                     });
                     it("removes it from the memory cache", () => {
-                        das.deleteDataFromCache("1", options);
+                        das.deleteDataFromCache(request, options);
                         expect(das.deleteFromMemoryCache).toHaveBeenCalledTimes(1);
                     });
                     it("does NOT remove it from the persistent cache", () => {
-                        das.deleteDataFromCache("1", options);
+                        das.deleteDataFromCache(request, options);
                         expect(das.deleteFromPersistentStorage).toHaveBeenCalledTimes(0);
                     });
                 });
                 describe("when memory option true, persistence false", () => {
-                    let options: DeleteCacheOptions
+                    let options: DeleteCacheOptions;
                     beforeEach(() => {
                         options = { memory: true, persistent: false };
                     });
                     it("removes it from the memory cache", () => {
-                        das.deleteDataFromCache("1", options);
+                        das.deleteDataFromCache(request, options);
                         expect(das.deleteFromMemoryCache).toHaveBeenCalledTimes(1);
                     });
                     it("does NOT remove it from the persistent cache", () => {
-                        das.deleteDataFromCache("1", options);
+                        das.deleteDataFromCache(request, options);
                         expect(das.deleteFromPersistentStorage).toHaveBeenCalledTimes(0);
                     });
                 });
                 describe("when persistence option only", () => {
-                    let options: DeleteCacheOptions
+                    let options: DeleteCacheOptions;
                     beforeEach(() => {
                         options = { persistent: true };
                     });
                     it("removes it from the memory cache", () => {
-                        das.deleteDataFromCache("1", options);
+                        das.deleteDataFromCache(request, options);
                         expect(das.deleteFromMemoryCache).toHaveBeenCalledTimes(0);
                     });
                     it("does NOT remove it from the persistent cache", () => {
-                        das.deleteDataFromCache("1", options);
+                        das.deleteDataFromCache(request, options);
                         expect(das.deleteFromPersistentStorage).toHaveBeenCalledTimes(1);
                     });
                 });
                 describe("when persistence true, memory false", () => {
-                    let options: DeleteCacheOptions
+                    let options: DeleteCacheOptions;
                     beforeEach(() => {
                         options = { persistent: true, memory: false };
                     });
                     it("removes it from the memory cache", () => {
-                        das.deleteDataFromCache("1", options);
+                        das.deleteDataFromCache(request, options);
                         expect(das.deleteFromMemoryCache).toHaveBeenCalledTimes(0);
                     });
                     it("does NOT remove it from the persistent cache", () => {
-                        das.deleteDataFromCache("1", options);
+                        das.deleteDataFromCache(request, options);
                         expect(das.deleteFromPersistentStorage).toHaveBeenCalledTimes(1);
                     });
                 });
@@ -868,14 +864,19 @@ describe("DataAccessSingleton", () => {
         });
     });
     describe("addInMemoryCache", () => {
+        let request: AjaxRequest;
+        beforeEach(() => {
+            request = getMockAjaxRequest("1");
+            request.memoryCache = { lifespanInSeconds: 10 };
+        });
         describe("when add an object", () => {
             let originalObject: FakeObject;
             beforeEach(() => {
                 originalObject = { id: "1", name: "Test1" };
             });
             it("adds a copy of the data to add", () => {
-                das.addInMemoryCache("1", 10, originalObject);
-                const result = das.getMemoryStoreData("1");
+                das.addInMemoryCache(request, originalObject);
+                const result = das.getMemoryStoreData(request);
                 expect(result.payload).not.toBe(originalObject);
             });
         });
@@ -886,11 +887,11 @@ describe("DataAccessSingleton", () => {
                 originalArray.push({ id: "1", name: "Test1" });
             });
             it("returns an array", () => {
-                das.addInMemoryCache("1", 10, originalArray);
-                const result = das.getMemoryStoreData("1");
+                das.addInMemoryCache(request, originalArray);
+                const result = das.getMemoryStoreData(request);
                 expect(result.payload instanceof Array).toBeTruthy();
             });
-        })
+        });
     });
 
     describe("fetchWithAjax", () => {
@@ -946,7 +947,7 @@ describe("DataAccessSingleton", () => {
                 it("returns the response", () => {
                     const promiseReturn = das.fetchWithAjax(request);
                     promiseNotFulfilled.resolveNow();
-                    promiseReturn.then((v) => {
+                    promiseReturn.then(v => {
                         expect(v).toEqual("data");
                     });
                 });
@@ -970,7 +971,7 @@ describe("DataAccessSingleton", () => {
                 it("rejects the promise", () => {
                     const promiseReturn = das.fetchWithAjax(request);
                     promiseNotFulfilled.rejectNow();
-                    promiseReturn.catch((e) => {
+                    promiseReturn.catch(e => {
                         expect(e).toBeDefined();
                     });
                     expect.assertions(1);
@@ -980,11 +981,13 @@ describe("DataAccessSingleton", () => {
     });
 
     describe("deleteFromMemoryCache", () => {
+        let request: AjaxRequest;
         beforeEach(() => {
+            request = getMockAjaxRequest("id");
             das.cachedResponse.delete = jest.fn();
         });
         it("calls the delete on the cache", () => {
-            das.deleteFromMemoryCache("id");
+            das.deleteFromMemoryCache(request);
             expect(das.cachedResponse.delete).toHaveBeenCalledTimes(1);
         });
     });
@@ -994,7 +997,7 @@ describe("DataAccessSingleton", () => {
             das.onGoingAjaxRequest.delete = jest.fn();
         });
         it("removes from on-going list", () => {
-            das.deleteOnGoingAjaxRequest("id");
+            das.deleteOnGoingAjaxRequest("id", "");
             expect(das.onGoingAjaxRequest.delete).toHaveBeenCalledTimes(1);
         });
     });
@@ -1036,7 +1039,7 @@ describe("DataAccessSingleton", () => {
             it("deletes performance insight", async () => {
                 try {
                     await das.fetchWeb(request);
-                } catch { }
+                } catch {}
                 expect(das.deletePerformanceInsight).toHaveBeenCalledTimes(1);
             });
         });

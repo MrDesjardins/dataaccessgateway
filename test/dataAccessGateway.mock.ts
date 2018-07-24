@@ -3,13 +3,13 @@ import { AjaxRequest, OnGoingAjaxRequest } from "../src/model";
 
 export function getMockAxiosRequestConfig(): AxiosRequestConfig {
     return {
-
+        url: "http://url"
     };
 }
 export function getMockAjaxRequest(id: string): AjaxRequest {
     return {
         id: id,
-        request: getMockAxiosRequestConfig(),
+        request: getMockAxiosRequestConfig()
     };
 }
 
@@ -27,14 +27,14 @@ export interface PromiseRetarder {
 }
 
 export function getPromiseRetarder(): PromiseRetarder {
-    return (function () {
+    return (function() {
         return {
-            promise: new Promise(function (resolve, reject) {
+            promise: new Promise(function(resolve, reject) {
                 this.resolveNow = resolve;
                 this.rejectNow = reject;
             }),
-            resolveNow: () => { },
-            rejectNow: () => { }
-        }
-    })()
+            resolveNow: () => {},
+            rejectNow: () => {}
+        };
+    })();
 }
