@@ -22,7 +22,7 @@ export function getMockAjaxRequestWithId(id: string): AjaxRequestWithId {
 
 export function getMockOnGoingAjaxRequest(id: string, data: any): OnGoingAjaxRequest {
     return {
-        ajaxRequest: getMockAjaxRequest(id),
+        ajaxRequest: getMockAjaxRequestWithId(id),
         promise: Promise.resolve(data)
     };
 }

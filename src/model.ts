@@ -35,7 +35,7 @@ export interface CacheDataWithId<T> extends CachedData<T> {
     id: string;
 }
 export interface OnGoingAjaxRequest {
-    ajaxRequest: AjaxRequest;
+    ajaxRequest: AjaxRequestWithId;
     promise: Promise<any>;
 }
 

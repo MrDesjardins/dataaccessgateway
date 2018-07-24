@@ -177,22 +177,17 @@ describe("DataAccessSingleton", () => {
     });
 
     describe("setDefaultCache", () => {
-        beforeEach(() => {
-            request = {
-                request: {}
-            };
-        });
         describe("when NO memory cache defined", () => {
             beforeEach(() => {
-                request.memoryCache = undefined;
+                requestWithId.memoryCache = undefined;
             });
             describe("when cache mandatory", () => {
                 beforeEach(() => {
                     das.options.isCacheMandatoryIfEnabled = true;
                 });
                 it("sets the default cache", () => {
-                    das.setDefaultCache(request);
-                    expect(request.memoryCache).toBeDefined();
+                    das.setDefaultCache(requestWithId);
+                    expect(requestWithId.memoryCache).toBeDefined();
                 });
             });
             describe("when cache NOT mandatory", () => {
@@ -200,41 +195,36 @@ describe("DataAccessSingleton", () => {
                     das.options.isCacheMandatoryIfEnabled = false;
                 });
                 it("does NOT sets the default cache", () => {
-                    das.setDefaultCache(request);
-                    expect(request.memoryCache).toBeUndefined();
+                    das.setDefaultCache(requestWithId);
+                    expect(requestWithId.memoryCache).toBeUndefined();
                 });
             });
             describe("when memory cache defined", () => {
                 let memoryCache: CacheConfiguration;
                 beforeEach(() => {
                     memoryCache = { lifespanInSeconds: 9876 };
-                    request.memoryCache = memoryCache;
+                    requestWithId.memoryCache = memoryCache;
                 });
                 it("does NOT sets the default cache", () => {
-                    das.setDefaultCache(request);
-                    expect(request.memoryCache).toBe(memoryCache);
+                    das.setDefaultCache(requestWithId);
+                    expect(requestWithId.memoryCache).toBe(memoryCache);
                 });
             });
         });
     });
 
     describe("setDefaultFastCache", () => {
-        beforeEach(() => {
-            request = {
-                request: {}
-            };
-        });
         describe("when NO persistent cache defined", () => {
             beforeEach(() => {
-                request.persistentCache = undefined;
+                requestWithId.persistentCache = undefined;
             });
             describe("when cache mandatory", () => {
                 beforeEach(() => {
                     das.options.isCacheMandatoryIfEnabled = true;
                 });
                 it("sets the default cache", () => {
-                    das.setDefaultFastCache(request);
-                    expect(request.persistentCache).toBeDefined();
+                    das.setDefaultFastCache(requestWithId);
+                    expect(requestWithId.persistentCache).toBeDefined();
                 });
             });
             describe("when cache NOT mandatory", () => {
@@ -242,19 +232,19 @@ describe("DataAccessSingleton", () => {
                     das.options.isCacheMandatoryIfEnabled = false;
                 });
                 it("does NOT sets the default cache", () => {
-                    das.setDefaultFastCache(request);
-                    expect(request.persistentCache).toBeUndefined();
+                    das.setDefaultFastCache(requestWithId);
+                    expect(requestWithId.persistentCache).toBeUndefined();
                 });
             });
             describe("when persistent cache defined", () => {
                 let fastCache: CacheConfiguration;
                 beforeEach(() => {
                     fastCache = { lifespanInSeconds: 9876 };
-                    request.persistentCache = fastCache;
+                    requestWithId.persistentCache = fastCache;
                 });
                 it("does NOT sets the default cache", () => {
-                    das.setDefaultFastCache(request);
-                    expect(request.persistentCache).toBe(fastCache);
+                    das.setDefaultFastCache(requestWithId);
+                    expect(requestWithId.persistentCache).toBe(fastCache);
                 });
             });
         });

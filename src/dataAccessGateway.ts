@@ -137,7 +137,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 this.logInfo({
                     action: DataAction.Use,
                     id: requestTyped.id,
-                    url: request.request.url!,
+                    url: requestTyped.request.url!,
                     source: DataSource.HttpRequest,
                     performanceInsight: this.setDataSize(this.getPerformanceInsight(requestTyped.id), response.result)
                 });
@@ -156,7 +156,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
      */
     public fetchFresh<T>(request: AjaxRequest): Promise<DataResponse<T>> {
         const requestTyped = this.setDefaultRequestId(request); // Default values
-        this.setDefaultCache(request); // We enforce a minimum memory cache of few seconds
+        this.setDefaultCache(requestTyped); // We enforce a minimum memory cache of few seconds
         this.startPerformanceInsight(requestTyped.id);
         return this.tryMemoryCacheFetching<T>(requestTyped)
             .then((memoryCacheValue: DataResponse<T> | undefined) => {
@@ -193,7 +193,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                     this.logInfo({
                         action: DataAction.Use,
                         id: requestTyped.id,
-                        url: request.request.url!,
+                        url: requestTyped.request.url!,
                         source: DataSource.MemoryCache,
                         performanceInsight: this.setDataSize(
                             this.getPerformanceInsight(requestTyped.id),
@@ -242,7 +242,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
      */
     public fetchFast<T>(request: AjaxRequest): Promise<DataResponse<T>> {
         const requestTyped = this.setDefaultRequestId(request); // Default values
-        this.setDefaultFastCache(request); // We enforce a minimum memory cache of few seconds
+        this.setDefaultFastCache(requestTyped); // We enforce a minimum memory cache of few seconds
         this.startPerformanceInsight(requestTyped.id);
 
         // If the flag is off, we skip and go directly to the Ajax
@@ -292,7 +292,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                     } else {
                         // We have something from the persistent cache
                         const persistentStorageEntry = persistentStorageValue as CachedData<T>;
-                        if (request.memoryCache !== undefined) {
+                        if (requestTyped.memoryCache !== undefined) {
                             this.addInMemoryCache(requestTyped, persistentStorageEntry.payload);
                         }
                         this.fetchAndSaveInCacheIfExpired<T>(
@@ -341,24 +341,24 @@ export class DataAccessSingleton implements IDataAccessSingleton {
     }
 
     public async fetchAndSaveInCacheIfExpired<T>(
-        request: AjaxRequestWithId,
+        requestTyped: AjaxRequestWithId,
         source: DataSource,
         cacheEntry?: CachedData<T> | undefined
     ): Promise<DataResponse<T>> {
         if (cacheEntry === undefined || new Date().getTime() > new Date(cacheEntry.expirationDateTime).getTime()) {
             try {
-                this.startPerformanceInsight(request.id, DataSource.HttpRequest);
-                const value: AxiosResponse<T> = await this.fetchWithAjax<T>(request);
-                this.setDataSize(this.stopPerformanceInsight(request.id, DataSource.HttpRequest), value.data);
+                this.startPerformanceInsight(requestTyped.id, DataSource.HttpRequest);
+                const value: AxiosResponse<T> = await this.fetchWithAjax<T>(requestTyped);
+                this.setDataSize(this.stopPerformanceInsight(requestTyped.id, DataSource.HttpRequest), value.data);
                 if (value.status >= 200 && value.status <= 399) {
                     this.logInfo({
                         action: DataAction.Fetch,
-                        id: request.id,
-                        url: request.request.url!,
+                        id: requestTyped.id,
+                        url: requestTyped.request.url!,
                         source: DataSource.HttpRequest,
-                        performanceInsight: this.getPerformanceInsight(request.id)
+                        performanceInsight: this.getPerformanceInsight(requestTyped.id)
                     });
-                    return this.saveCache(request, {
+                    return this.saveCache(requestTyped, {
                         source: DataSource.HttpRequest,
                         result: value.data
                     });
@@ -366,14 +366,14 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                     throw Error("Cannot cache request that are not in the range of 200 or in the range of 300.");
                 }
             } catch (error) {
-                this.stopPerformanceInsight(this.getPerformanceInsight(request.id), DataSource.HttpRequest);
+                this.stopPerformanceInsight(this.getPerformanceInsight(requestTyped.id), DataSource.HttpRequest);
                 this.logError({
-                    id: request.id,
-                    url: request.request.url!,
+                    id: requestTyped.id,
+                    url: requestTyped.request.url!,
                     error: error,
                     source: DataSource.HttpRequest,
                     action: DataAction.Fetch,
-                    performanceInsight: this.getPerformanceInsight(request.id)
+                    performanceInsight: this.getPerformanceInsight(requestTyped.id)
                 });
                 throw error;
             }
@@ -404,53 +404,53 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         return { id: request.id, ...request };
     }
 
-    public setDefaultCache(request: AjaxRequest): void {
-        if (request.memoryCache === undefined && this.options.isCacheMandatoryIfEnabled) {
-            request.memoryCache = {
+    public setDefaultCache(requestWithId: AjaxRequestWithId): void {
+        if (requestWithId.memoryCache === undefined && this.options.isCacheMandatoryIfEnabled) {
+            requestWithId.memoryCache = {
                 lifespanInSeconds: this.options.defaultLifeSpanInSeconds
             }; // Provide ALWAYS a minimum memory cache with small life
         }
     }
-    public setDefaultFastCache(request: AjaxRequest): void {
-        this.setDefaultCache(request);
-        if (request.persistentCache === undefined && this.options.isCacheMandatoryIfEnabled) {
-            request.persistentCache = {
+    public setDefaultFastCache(requestWithId: AjaxRequestWithId): void {
+        this.setDefaultCache(requestWithId);
+        if (requestWithId.persistentCache === undefined && this.options.isCacheMandatoryIfEnabled) {
+            requestWithId.persistentCache = {
                 lifespanInSeconds: this.options.defaultLifeSpanInSeconds
             }; // Provide ALWAYS a minimum memory cache with small life
         }
     }
 
     public saveCache<T>(
-        request: AjaxRequestWithId,
+        requestWithId: AjaxRequestWithId,
         responseFromCacheOrAjax: DataResponse<T>
     ): Promise<DataResponse<T>> {
         // At the end, we check if we need to store in any of the cache
-        if (request.memoryCache !== undefined) {
-            this.addInMemoryCache(request, responseFromCacheOrAjax.result);
+        if (requestWithId.memoryCache !== undefined) {
+            this.addInMemoryCache(requestWithId, responseFromCacheOrAjax.result);
         }
-        if (request.persistentCache !== undefined) {
+        if (requestWithId.persistentCache !== undefined) {
             const currentUTCDataWithLifeSpanAdded = new Date(
-                new Date().getTime() + request.persistentCache.lifespanInSeconds * 1000
+                new Date().getTime() + requestWithId.persistentCache.lifespanInSeconds * 1000
             );
             const cachedData: CachedData<T> = {
                 expirationDateTime: currentUTCDataWithLifeSpanAdded,
                 payload: responseFromCacheOrAjax.result
             };
-            this.addInPersistentStore(request.id, request.request.url!, cachedData);
+            this.addInPersistentStore(requestWithId.id, requestWithId.request.url!, cachedData);
         }
         return Promise.resolve(responseFromCacheOrAjax);
     }
 
-    public tryMemoryCacheFetching<T>(request: AjaxRequestWithId): Promise<DataResponse<T> | undefined> {
-        if (this.options.isCacheEnabled === false || request.memoryCache === undefined) {
+    public tryMemoryCacheFetching<T>(requestWithId: AjaxRequestWithId): Promise<DataResponse<T> | undefined> {
+        if (this.options.isCacheEnabled === false || requestWithId.memoryCache === undefined) {
             return Promise.resolve(undefined);
         }
-        const cacheEntry: CachedData<T> | undefined = this.getMemoryStoreData(request);
+        const cacheEntry: CachedData<T> | undefined = this.getMemoryStoreData(requestWithId);
         if (cacheEntry !== undefined) {
             // If expired, fetch
             if (new Date().getTime() > new Date(cacheEntry.expirationDateTime).getTime()) {
                 // Delete from cache
-                this.deleteFromMemoryCache(request);
+                this.deleteFromMemoryCache(requestWithId);
             } else {
                 // Return the cached response
                 return Promise.resolve({
@@ -462,24 +462,24 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         return Promise.resolve(undefined);
     }
 
-    public async tryPersistentStorageFetching<T>(request: AjaxRequestWithId): Promise<DataResponse<T> | undefined> {
-        if (this.options.isCacheEnabled === false || request.persistentCache === undefined) {
+    public async tryPersistentStorageFetching<T>(requestWithId: AjaxRequestWithId): Promise<DataResponse<T> | undefined> {
+        if (this.options.isCacheEnabled === false || requestWithId.persistentCache === undefined) {
             return undefined;
         }
         try {
-            const persistentStorageValue = await this.getPersistentStoreData<T>(request);
+            const persistentStorageValue = await this.getPersistentStoreData<T>(requestWithId);
             if (persistentStorageValue !== undefined) {
                 const localStorageCacheEntry = persistentStorageValue;
                 if (new Date().getTime() > new Date(localStorageCacheEntry.expirationDateTime).getTime()) {
-                    this.deleteFromPersistentStorage(request);
+                    this.deleteFromPersistentStorage(requestWithId);
                 } else {
                     this.logInfo({
                         action: DataAction.Use,
-                        id: request.id,
-                        url: request.request.url!,
+                        id: requestWithId.id,
+                        url: requestWithId.request.url!,
                         source: DataSource.PersistentStorageCache,
                         performanceInsight: this.setDataSize(
-                            this.getPerformanceInsight(request.id),
+                            this.getPerformanceInsight(requestWithId.id),
                             localStorageCacheEntry.payload
                         )
                     });
@@ -492,12 +492,12 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             return Promise.resolve(undefined);
         } catch (reason) {
             this.logError({
-                id: request.id,
-                url: request.request.url!,
+                id: requestWithId.id,
+                url: requestWithId.request.url!,
                 error: reason,
                 source: DataSource.PersistentStorageCache,
                 action: DataAction.Use,
-                performanceInsight: this.getPerformanceInsight(request.id)
+                performanceInsight: this.getPerformanceInsight(requestWithId.id)
             });
             return undefined;
         }
@@ -647,9 +647,9 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         return insight;
     }
 
-    public deleteFromMemoryCache(request: AjaxRequestWithId): void {
-        const id = request.id;
-        const url = request.request.url!;
+    public deleteFromMemoryCache(requestWithId: AjaxRequestWithId): void {
+        const id = requestWithId.id;
+        const url = requestWithId.request.url!;
         this.logInfo({
             id: id,
             url: url,
@@ -687,10 +687,10 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         this.onGoingAjaxRequest.delete(id);
     }
 
-    public addInMemoryCache<T>(request: AjaxRequestWithId, dataToAdd: T): void {
-        const id = request.id;
-        const url = request.request.url!;
-        const lifespanInSeconds = request.memoryCache!.lifespanInSeconds;
+    public addInMemoryCache<T>(requestWithId: AjaxRequestWithId, dataToAdd: T): void {
+        const id = requestWithId.id;
+        const url = requestWithId.request.url!;
+        const lifespanInSeconds = requestWithId.memoryCache!.lifespanInSeconds;
         const currentUTCDataWithLifeSpanAdded = new Date(new Date().getTime() + lifespanInSeconds * 1000);
         this.cachedResponse.set(
             id,
@@ -762,9 +762,9 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             });
         }
     }
-    public getMemoryStoreData<T>(request: AjaxRequestWithId): CachedData<T> | undefined {
-        const id = request.id;
-        const url = request.request.url!;
+    public getMemoryStoreData<T>(requestWithId: AjaxRequestWithId): CachedData<T> | undefined {
+        const id = requestWithId.id;
+        const url = requestWithId.request.url!;
         this.startPerformanceInsight(id, DataSource.MemoryCache);
         const cacheValue = this.cachedResponse.get(id);
         this.stopPerformanceInsight(id, DataSource.MemoryCache);
@@ -780,9 +780,9 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         }
         return JSON.parse(cacheValue) as CachedData<T>;
     }
-    public async getPersistentStoreData<T>(request: AjaxRequestWithId): Promise<CacheDataWithId<T> | undefined> {
-        const id = request.id;
-        const url = request.request.url!;
+    public async getPersistentStoreData<T>(requestWithId: AjaxRequestWithId): Promise<CacheDataWithId<T> | undefined> {
+        const id = requestWithId.id;
+        const url = requestWithId.request.url!;
         try {
             if (this.openIndexDb === undefined) {
                 return undefined;
@@ -812,9 +812,9 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         }
     }
 
-    public async deleteFromPersistentStorage(request: AjaxRequestWithId): Promise<void> {
-        const id = request.id;
-        const url = request.request.url!;
+    public async deleteFromPersistentStorage(requestWithId: AjaxRequestWithId): Promise<void> {
+        const id = requestWithId.id;
+        const url = requestWithId.request.url!;
         try {
             if (this.openIndexDb === undefined) {
                 return;
