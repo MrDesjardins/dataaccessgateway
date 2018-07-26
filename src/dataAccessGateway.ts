@@ -38,6 +38,7 @@ export interface IDataAccessSingleton {
     fetchFast<T>(request: AjaxRequest): Promise<DataResponse<T>>;
     fetchWeb<T>(request: AjaxRequest): Promise<DataResponse<T>>;
     deleteDataFromCache(request: AjaxRequest, options?: DeleteCacheOptions): void;
+    deletePersistentStorage(name: string): Promise<void>;
 }
 
 export interface DeleteCacheOptions {
@@ -462,7 +463,9 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         return Promise.resolve(undefined);
     }
 
-    public async tryPersistentStorageFetching<T>(requestWithId: AjaxRequestWithId): Promise<DataResponse<T> | undefined> {
+    public async tryPersistentStorageFetching<T>(
+        requestWithId: AjaxRequestWithId
+    ): Promise<DataResponse<T> | undefined> {
         if (this.options.isCacheEnabled === false || requestWithId.persistentCache === undefined) {
             return undefined;
         }
@@ -843,6 +846,19 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             if (options.persistent !== undefined && options.persistent === true) {
                 this.deleteFromPersistentStorage(requestWithId);
             }
+        }
+    }
+    public async deletePersistentStorage(name: string): Promise<void> {
+        try {
+            return await Dexie.delete(name);
+        } catch (reason) {
+            this.logError({
+                id: "",
+                url: "",
+                error: reason,
+                source: DataSource.PersistentStorageCache,
+                action: DataAction.System
+            });
         }
     }
 }
