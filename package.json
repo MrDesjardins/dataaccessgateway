@@ -1,82 +1,82 @@
 {
-  "name": "dataaccessgateway",
-  "version": "0.0.30",
-  "description": "A simple library that cache in two different levels HTTP requests",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/MrDesjardins/dataaccessgateway"
-  },
-  "bugs": {
-    "url": "https://github.com/MrDesjardins/dataaccessgateway/issues"
-  },
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "scripts": {
-    "build": "webpack --config webpack.prod.js --env.production",
-    "builddev": "webpack --config webpack.dev.js --env.development",
-    "builddtsc": "node_modules/typescript/bin/tsc",
-    "test": "node_modules/jest-cli/bin/jest.js",
-    "testdev": "node_modules/jest-cli/bin/jest.js --watch",
-    "coverage": "node_modules/jest-cli/bin/jest.js --coverage",
-    "sendcoverage": "cat coverage/lcov.info | node_modules/coveralls/bin/coveralls.js"
-  },
-  "keywords": [
-    "data",
-    "access",
-    "cache",
-    "rest",
-    "api",
-    "http"
-  ],
-  "author": {
-    "name": "Patrick Desjardins",
-    "email": "mrdesjardins@gmail.com"
-  },
-  "license": "MIT",
-  "dependencies": {
-    "dexie": "2.0.3",
-    "object-hash": "^1.3.0"
-  },
-  "peerDependencies": {
-    "axios": "0.18.0"
-  },
-  "devDependencies": {
-    "@types/axios": "^0.14.0",
-    "@types/chrome": "0.0.69",
-    "@types/dexie": "^1.3.1",
-    "@types/jest": "^22.2.3",
-    "@types/object-hash": "^1.2.0",
-    "clean-webpack-plugin": "^0.1.19",
-    "coveralls": "^3.0.0",
-    "jest": "^22.4.3",
-    "jest-cli": "^22.4.4",
-    "ts-jest": "^22.4.4",
-    "ts-loader": "^4.2.0",
-    "typescript": "^2.8.3",
-    "uglifyjs-webpack-plugin": "^1.2.5",
-    "webpack": "^4.6.0",
-    "webpack-cli": "^2.0.15",
-    "webpack-merge": "^4.1.2"
-  },
-  "jest": {
-    "setupFiles": [
-      "./test/setupTests.ts"
+    "name": "dataaccessgateway",
+    "version": "0.0.31",
+    "description": "A simple library that cache in two different levels HTTP requests",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/MrDesjardins/dataaccessgateway"
+    },
+    "bugs": {
+        "url": "https://github.com/MrDesjardins/dataaccessgateway/issues"
+    },
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "scripts": {
+        "build": "webpack --config webpack.prod.js --env.production",
+        "builddev": "webpack --config webpack.dev.js --env.development",
+        "builddtsc": "node_modules/typescript/bin/tsc",
+        "test": "node_modules/jest-cli/bin/jest.js",
+        "testdev": "node_modules/jest-cli/bin/jest.js --watch",
+        "coverage": "node_modules/jest-cli/bin/jest.js --coverage",
+        "sendcoverage": "cat coverage/lcov.info | node_modules/coveralls/bin/coveralls.js"
+    },
+    "keywords": [
+        "data",
+        "access",
+        "cache",
+        "rest",
+        "api",
+        "http"
     ],
-    "globals": {
-      "__VERSION__": "test"
+    "author": {
+        "name": "Patrick Desjardins",
+        "email": "mrdesjardins@gmail.com"
     },
-    "moduleFileExtensions": [
-      "ts",
-      "tsx",
-      "js",
-      "json"
-    ],
-    "transform": {
-      "\\.tsx?$": "ts-jest"
+    "license": "MIT",
+    "dependencies": {
+        "object-hash": "^1.3.0",
+        "dexie": "2.0.3"
     },
-    "moduleNameMapper": {
-      "^test/(.*)$": "<rootDir>/test/$1"
+    "peerDependencies": {
+        "axios": "0.18.0"
     },
-    "testRegex": "\\.test\\.(js|ts)x?$"
-  }
+    "devDependencies": {
+        "@types/axios": "^0.14.0",
+        "@types/chrome": "0.0.69",
+        "@types/dexie": "^1.3.1",
+        "@types/jest": "^22.2.3",
+        "@types/object-hash": "^1.2.0",
+        "clean-webpack-plugin": "^0.1.19",
+        "coveralls": "^3.0.0",
+        "jest": "^22.4.3",
+        "jest-cli": "^22.4.4",
+        "ts-jest": "^22.4.4",
+        "ts-loader": "^4.2.0",
+        "typescript": "^2.8.3",
+        "uglifyjs-webpack-plugin": "^1.2.5",
+        "webpack": "^4.6.0",
+        "webpack-cli": "^2.0.15",
+        "webpack-merge": "^4.1.2"
+    },
+    "jest": {
+        "setupFiles": [
+            "./test/setupTests.ts"
+        ],
+        "globals": {
+            "__VERSION__": "test"
+        },
+        "moduleFileExtensions": [
+            "ts",
+            "tsx",
+            "js",
+            "json"
+        ],
+        "transform": {
+            "\\.tsx?$": "ts-jest"
+        },
+        "moduleNameMapper": {
+            "^test/(.*)$": "<rootDir>/test/$1"
+        },
+        "testRegex": "\\.test\\.(js|ts)x?$"
+    }
 }

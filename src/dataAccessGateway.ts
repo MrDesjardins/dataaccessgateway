@@ -140,7 +140,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                     id: requestTyped.id,
                     url: requestTyped.request.url!,
                     source: DataSource.HttpRequest,
-                    performanceInsight: this.setDataSize(this.getPerformanceInsight(requestTyped.id), response.result)
+                    performanceInsight: this.setDataSize(this.getPerformanceInsight(requestTyped.id), response.result),
+                    dataSignature: hash.sha1(response.result)
                 });
                 this.deletePerformanceInsight(requestTyped.id);
                 return response;
@@ -173,7 +174,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                                     performanceInsight: this.setDataSize(
                                         this.getPerformanceInsight(requestTyped.id),
                                         persistentCacheValue.result
-                                    )
+                                    ),
+                                    dataSignature: hash.sha1(persistentCacheValue.result)
                                 });
                             }
                             return persistentCacheValue;
@@ -198,8 +200,9 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                         source: DataSource.MemoryCache,
                         performanceInsight: this.setDataSize(
                             this.getPerformanceInsight(requestTyped.id),
-                            memoryCacheValue
-                        )
+                            memoryCacheValue.result
+                        ),
+                        dataSignature: hash.sha1(memoryCacheValue.result)
                     });
                     this.deletePerformanceInsight(requestTyped.id);
                     return memoryCacheValue;
@@ -218,7 +221,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                             performanceInsight: this.setDataSize(
                                 this.getPerformanceInsight(requestTyped.id),
                                 value.data
-                            )
+                            ),
+                            dataSignature: hash.sha1(value.data)
                         });
                         this.deletePerformanceInsight(requestTyped.id);
                         return Promise.resolve({
@@ -259,7 +263,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                         performanceInsight: this.setDataSize(
                             this.getPerformanceInsight(requestTyped.id),
                             response.result
-                        )
+                        ),
+                        dataSignature: hash.sha1(response.result)
                     });
                     return response;
                 }
@@ -285,7 +290,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                                     performanceInsight: this.setDataSize(
                                         this.getPerformanceInsight(requestTyped.id),
                                         response.result
-                                    )
+                                    ),
+                                    dataSignature: hash.sha1(response.result)
                                 });
                                 return response;
                             }
@@ -311,7 +317,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                             performanceInsight: this.setDataSize(
                                 this.getPerformanceInsight(requestTyped.id),
                                 persistentStorageEntry.payload
-                            )
+                            ),
+                            dataSignature: hash.sha1(persistentStorageEntry.payload)
                         });
                         return Promise.resolve({
                             source: DataSource.PersistentStorageCache,
@@ -332,7 +339,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 performanceInsight: this.setDataSize(
                     this.getPerformanceInsight(requestTyped.id),
                     memoryCacheEntry.payload
-                )
+                ),
+                dataSignature: hash.sha1(memoryCacheEntry.payload)
             });
             return Promise.resolve({
                 source: DataSource.MemoryCache,
@@ -357,7 +365,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                         id: requestTyped.id,
                         url: requestTyped.request.url!,
                         source: DataSource.HttpRequest,
-                        performanceInsight: this.getPerformanceInsight(requestTyped.id)
+                        performanceInsight: this.getPerformanceInsight(requestTyped.id),
+                        dataSignature: hash.sha1(value.data)
                     });
                     return this.saveCache(requestTyped, {
                         source: DataSource.HttpRequest,
@@ -484,7 +493,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                         performanceInsight: this.setDataSize(
                             this.getPerformanceInsight(requestWithId.id),
                             localStorageCacheEntry.payload
-                        )
+                        ),
+                        dataSignature: hash.sha1(localStorageCacheEntry.payload)
                     });
                     return {
                         source: DataSource.PersistentStorageCache,
@@ -535,7 +545,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 url: requestWithId.request.url!,
                 source: DataSource.HttpRequest,
                 action: DataAction.WaitingOnGoingRequest,
-                performanceInsight: this.getPerformanceInsight(requestWithId.id)
+                performanceInsight: this.getPerformanceInsight(requestWithId.id),
+                dataSignature: undefined
             });
             return cacheOnGoingEntry.promise;
         }
@@ -658,7 +669,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             url: url,
             source: DataSource.MemoryCache,
             action: DataAction.Delete,
-            performanceInsight: this.getPerformanceInsight(id)
+            performanceInsight: this.getPerformanceInsight(id),
+            dataSignature: undefined
         });
         this.cachedResponse.delete(id);
     }
@@ -672,7 +684,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             url: requestWithId.request.url!,
             source: DataSource.HttpRequest,
             action: DataAction.AddFromOnGoingRequest,
-            performanceInsight: this.getPerformanceInsight(requestWithId.id)
+            performanceInsight: this.getPerformanceInsight(requestWithId.id),
+            dataSignature: undefined
         });
         this.onGoingAjaxRequest.set(requestWithId.id, {
             ajaxRequest: requestWithId,
@@ -685,7 +698,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             url: url,
             source: DataSource.HttpRequest,
             action: DataAction.RemoveFromOnGoingRequest,
-            performanceInsight: this.getPerformanceInsight(id)
+            performanceInsight: this.getPerformanceInsight(id),
+            dataSignature: undefined
         });
         this.onGoingAjaxRequest.delete(id);
     }
@@ -707,7 +721,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             url: url,
             source: DataSource.MemoryCache,
             action: DataAction.Save,
-            performanceInsight: this.getPerformanceInsight(id)
+            performanceInsight: this.getPerformanceInsight(id),
+            dataSignature: hash.sha1(dataToAdd)
         });
     }
 
@@ -729,7 +744,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                                 url: url,
                                 source: DataSource.PersistentStorageCache,
                                 action: DataAction.Save,
-                                performanceInsight: this.getPerformanceInsight(id)
+                                performanceInsight: this.getPerformanceInsight(id),
+                                dataSignature: hash.sha1(cacheData.payload)
                             });
                         })
                         .catch(e => {
@@ -776,7 +792,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             id: id,
             url: url,
             source: DataSource.MemoryCache,
-            performanceInsight: this.getPerformanceInsight(id)
+            performanceInsight: this.getPerformanceInsight(id),
+            dataSignature: hash.sha1(cacheValue === undefined ? "" : cacheValue)
         });
         if (cacheValue === undefined) {
             return undefined;
@@ -798,7 +815,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 id: id,
                 url: url,
                 source: DataSource.PersistentStorageCache,
-                performanceInsight: this.getPerformanceInsight(id)
+                performanceInsight: this.getPerformanceInsight(id),
+                dataSignature: hash.sha1(resultPromise === undefined ? "" : resultPromise.payload)
             });
             return resultPromise;
         } catch (reason) {

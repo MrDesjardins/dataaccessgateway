@@ -84,4 +84,5 @@ export interface LogError extends LogBase {
 }
 export interface LogInfo extends LogBase {
     kind: "LogInfo";
+    dataSignature: string | undefined;
 }
