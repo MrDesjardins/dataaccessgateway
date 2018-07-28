@@ -33,6 +33,7 @@ export interface CachedData<T> {
 }
 export interface CacheDataWithId<T> extends CachedData<T> {
     id: string;
+    url: string; // Only used to help debugging
 }
 export interface OnGoingAjaxRequest {
     ajaxRequest: AjaxRequestWithId;

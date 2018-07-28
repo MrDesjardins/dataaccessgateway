@@ -117,7 +117,16 @@ describe("DataAccessSingleton", () => {
         describe("partial options", () => {
             it("uses default value for unspecified options", () => {
                 das.setConfiguration({ isCacheEnabled: false });
-                expect(das.options.defaultLifeSpanInSeconds).toBe(das.DefaultOptions.defaultLifeSpanInSeconds);
+                expect(das.options.defaultLifeSpanInSeconds).toEqual(das.DefaultOptions.defaultLifeSpanInSeconds);
+            });
+        });
+        describe("already have options", () => {
+            beforeEach(() => {
+                das.setConfiguration({ defaultLifeSpanInSeconds: 1 });
+            });
+            it("keeps previous options (not revert to default)", () => {
+                das.setConfiguration({ isCacheEnabled: true });
+                expect(das.options.defaultLifeSpanInSeconds).toEqual(1);
             });
         });
     });
@@ -1277,6 +1286,49 @@ describe("DataAccessSingleton", () => {
                     expect(result.persistentStorageCache).toBe(ref.persistentStorageCache);
                     expect(result.memoryCache).toBe(ref.memoryCache);
                     expect(result.httpRequest).toBe(ref.httpRequest);
+                });
+            });
+        });
+        describe("writeSignature", () => {
+            describe("option does not mention to skip the signature", () => {
+                beforeEach(() => {
+                    das.options.skipDataSignature = false;
+                });
+                describe("when alter function is defined", () => {
+                    beforeEach(() => {
+                        das.options.alterObjectBeforeHashing = o => {
+                            return {
+                                a: 1
+                            };
+                        };
+                    });
+                    it("hashes the object but does not return the hash of the full object", () => {
+                        const result = das.writeSignature({ a: 1, b: 2 });
+                        expect(result).not.toEqual(hash.sha1({ a: 1, b: 2 }));
+                    });
+                    it("hashes the returned object of the function", () => {
+                        const result = das.writeSignature({ a: 1, b: 2 });
+                        expect(result).toEqual(hash.sha1({ a: 1 }));
+                    });
+                });
+                describe("when alter function is undefined", () => {
+                    beforeEach(() => {
+                        das.options.alterObjectBeforeHashing = undefined;
+                    });
+                    it("hashes the object", () => {
+                        const result = das.writeSignature({ a: 1, b: 2 });
+                        expect(result).toEqual(hash.sha1({ a: 1, b: 2 }));
+                    });
+                });
+            });
+
+            describe("option does mention to skip the signature", () => {
+                beforeEach(() => {
+                    das.options.skipDataSignature = true;
+                });
+                it("always return an empty string", () => {
+                    const result = das.writeSignature({ a: 1, b: 2 });
+                    expect(result).toEqual("");
                 });
             });
         });
