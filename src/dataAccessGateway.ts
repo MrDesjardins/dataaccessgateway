@@ -25,7 +25,6 @@ export interface DataAccessSingletonOptions {
     defaultLifeSpanInSeconds: number;
     logError: (error: LogError) => void;
     logInfo: (info: LogInfo) => void;
-    skipDataSignature: boolean;
     alterObjectBeforeHashing?: <T>(obj: T) => any;
 }
 
@@ -54,6 +53,7 @@ export interface DeleteCacheOptions {
  */
 export class DataAccessSingleton implements IDataAccessSingleton {
     private static instance: DataAccessSingleton | undefined = undefined;
+    public generateSignature: boolean = false;
     public DefaultOptions: Readonly<DataAccessSingletonOptions> = {
         isCacheEnabled: true,
         isCacheMandatoryIfEnabled: true,
@@ -64,7 +64,6 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         logInfo: () => {
             /*Nothing*/
         },
-        skipDataSignature: true,
         alterObjectBeforeHashing: undefined
     };
     public options: DataAccessSingletonOptions = this.DefaultOptions;
@@ -84,6 +83,22 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 error: e
             });
         }
+
+        window.addEventListener(
+            "message",
+            (event: MessageEvent) => {
+                if (event.data) {
+                    console.warn("MESSAGE EVENT", event.data );
+                    if (event.data.source === "dataaccessgateway-devtools" && event.data.name === "action") {
+                        if (event.data.data.id === "signature") {
+                            this.generateSignature = event.data.data.value;
+                            console.warn("GENERATE SIGNATURE EVENT", this.generateSignature);
+                        }
+                    }
+                }
+            },
+            false
+        );
     }
 
     public static getInstance(databaseName: string): IDataAccessSingleton {
@@ -885,7 +900,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
     }
 
     public writeSignature<T>(payload: T): string {
-        if (this.options.skipDataSignature) {
+        if (!this.generateSignature) {
             return "";
         }
         let objToHash = payload;

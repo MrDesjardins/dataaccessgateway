@@ -1292,7 +1292,7 @@ describe("DataAccessSingleton", () => {
         describe("writeSignature", () => {
             describe("option does not mention to skip the signature", () => {
                 beforeEach(() => {
-                    das.options.skipDataSignature = false;
+                    das.generateSignature = true;
                 });
                 describe("when alter function is defined", () => {
                     beforeEach(() => {
@@ -1324,7 +1324,7 @@ describe("DataAccessSingleton", () => {
 
             describe("option does mention to skip the signature", () => {
                 beforeEach(() => {
-                    das.options.skipDataSignature = true;
+                    das.generateSignature = false;
                 });
                 it("always return an empty string", () => {
                     const result = das.writeSignature({ a: 1, b: 2 });

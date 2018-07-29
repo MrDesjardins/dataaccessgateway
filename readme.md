@@ -105,11 +105,10 @@ DataAccessGateway("AppName").setConfiguration({ defaultLifeSpanInSeconds: 120 })
 ``` 
 
 ## Signature
-It is possible to turn on the creation of payload signature. This is an experimental feature. It works in collaboration with the Chrome's extension. It should never been used in production because it has a huge impact in performance. The goal is to capture a unique signature on every payload to compare of something changed. The Chrome's extension can gather difference and give insight about the timing of specific endpoint change. To use the feature:
+It is possible to turn on the creation of payload signature. This is an experimental feature. It works in collaboration with the Chrome's extension which allow to turn to on the signature creation. Once it is done, the gateway library will generate a hash and share the hash with the data payload to the Chrome Extension. It should never been used in production because it has a huge impact in performance. The goal is to capture a unique signature on every payload to compare of something changed. The Chrome's extension can gather difference and give insight about the timing of specific endpoint change. To use the feature:
 
 ```
 DataAccessGateway("AppName")..setConfiguration({
-    skipDataSignature: false,
     alterObjectBeforeHashing: (obj: any) => {
         const clone = { ...obj };
         removeProperty(clone, "lastGenerated");
@@ -118,7 +117,7 @@ DataAccessGateway("AppName")..setConfiguration({
 }); 
 ```
 
-The code example contains the `skipDataSignature` to `false` which will generate the hash of every object. The `alterObjectBeforeHashing` give a change to alter the object before being hashed. The function is useful if you need to remove something that change all the time to an object or to remove a branch that can be time consuming to hash. A normal use case is to remove a property that is changing all the time from the API like the last time generated time the data was built by the API which could be different on every call.
+The code example has a `alterObjectBeforeHashing` give a change to alter the object before being hashed. The function is useful if you need to remove something that change all the time to an object or to remove a branch that can be time consuming to hash. A normal use case is to remove a property that is changing all the time from the API like the last time generated time the data was built by the API which could be different on every call.
 
 ## Todo List:
 - Increase Unit Tests
