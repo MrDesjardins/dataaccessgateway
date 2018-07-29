@@ -84,15 +84,16 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             });
         }
 
+        // Listen to message and scope down to only these coming from the DAG Chrome extension that 
+        // is an action. For the data.id "signature" we use the value to turn on or off the generation
+        // of a signature.
         window.addEventListener(
             "message",
             (event: MessageEvent) => {
                 if (event.data) {
-                    console.warn("MESSAGE EVENT", event.data );
                     if (event.data.source === "dataaccessgateway-devtools" && event.data.name === "action") {
                         if (event.data.data.id === "signature") {
                             this.generateSignature = event.data.data.value;
-                            console.warn("GENERATE SIGNATURE EVENT", this.generateSignature);
                         }
                     }
                 }
