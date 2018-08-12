@@ -9,6 +9,7 @@ export enum FetchType{
 export interface CacheConfiguration {
     lifespanInSeconds: number;
 }
+
 export interface AjaxRequest {
     /**
      * Identifier of the request. Need to be unique. If not provided, the hash of request is used
@@ -29,8 +30,9 @@ export interface AjaxRequest {
     persistentCache?: CacheConfiguration;
 }
 
-export interface AjaxRequestWithId extends AjaxRequest {
+export interface AjaxRequestInternal extends AjaxRequest {
     id: string;
+    fetchType: FetchType;
 }
 
 export interface CachedData<T> {
@@ -42,7 +44,7 @@ export interface CacheDataWithId<T> extends CachedData<T> {
     url: string; // Only used to help debugging
 }
 export interface OnGoingAjaxRequest {
-    ajaxRequest: AjaxRequestWithId;
+    ajaxRequest: AjaxRequestInternal;
     promise: Promise<any>;
 }
 
@@ -92,4 +94,5 @@ export interface LogError extends LogBase {
 export interface LogInfo extends LogBase {
     kind: "LogInfo";
     dataSignature: string | undefined;
+    fetchType: FetchType;
 }

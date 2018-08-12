@@ -1,7 +1,7 @@
 import axios, { AxiosPromise, AxiosRequestConfig, AxiosResponse } from "axios";
 import Dexie from "dexie";
 import hash from "object-hash";
-import { AjaxRequest, AjaxRequestWithId, CacheDataWithId, CachedData, DataAction, DataResponse, DataSource, FetchType, LogError, LogInfo, OnGoingAjaxRequest, PerformanceRequestInsight } from "./model";
+import { AjaxRequest, AjaxRequestInternal, CacheDataWithId, CachedData, DataAction, DataResponse, DataSource, FetchType, LogError, LogInfo, OnGoingAjaxRequest, PerformanceRequestInsight } from "./model";
 export class DataAccessIndexDbDatabase extends Dexie {
     public data!: Dexie.Table<CacheDataWithId<any>, string>; // Will be initialized later
 
@@ -91,16 +91,20 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         window.addEventListener(
             "message",
             (event: MessageEvent) => {
-                if (event.data) {
-                    if (event.data.source === "dataaccessgateway-devtools" && event.data.name === "action") {
-                        if (event.data.data.id === "signature") {
-                            this.generateSignature = event.data.data.value;
-                        }
-                    }
-                }
+                this.onListenMessage(event);
             },
             false
         );
+    }
+
+    public onListenMessage(event: MessageEvent): void {
+        if (event.data) {
+            if (event.data.source === "dataaccessgateway-devtools" && event.data.name === "action") {
+                if (event.data.data.id === "signature") {
+                    this.generateSignature = event.data.data.value;
+                }
+            }
+        }
     }
 
     public static getInstance(databaseName: string): IDataAccessSingleton {
@@ -161,7 +165,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         }
     }
     public fetchWeb<T>(request: AjaxRequest): Promise<DataResponse<T>> {
-        const requestTyped = this.setDefaultRequestId(request); // Default values
+        const requestTyped = this.setDefaultRequestValues(request, FetchType.Web); // Default values
         this.startPerformanceInsight(requestTyped.id);
         return this.fetchAndSaveInCacheIfExpired<T>(requestTyped, DataSource.HttpRequest)
             .then((response: DataResponse<T>) => {
@@ -172,7 +176,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                     url: requestTyped.request.url!,
                     source: DataSource.HttpRequest,
                     performanceInsight: this.setDataSize(this.getPerformanceInsight(requestTyped.id), response.result),
-                    dataSignature: this.writeSignature(response.result)
+                    dataSignature: this.writeSignature(response.result),
+                    fetchType: requestTyped.fetchType
                 });
                 this.deletePerformanceInsight(requestTyped.id);
                 return response;
@@ -188,7 +193,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
      * subsequent request will be faster. This function focus on accuracy first.
      */
     public fetchFresh<T>(request: AjaxRequest): Promise<DataResponse<T>> {
-        const requestTyped = this.setDefaultRequestId(request); // Default values
+        const requestTyped = this.setDefaultRequestValues(request, FetchType.Fresh); // Default values
         this.setDefaultCache(requestTyped); // We enforce a minimum memory cache of few seconds
         this.startPerformanceInsight(requestTyped.id);
         return this.tryMemoryCacheFetching<T>(requestTyped)
@@ -206,7 +211,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                                         this.getPerformanceInsight(requestTyped.id),
                                         persistentCacheValue.result
                                     ),
-                                    dataSignature: this.writeSignature(persistentCacheValue.result)
+                                    dataSignature: this.writeSignature(persistentCacheValue.result),
+                                    fetchType: requestTyped.fetchType
                                 });
                             }
                             return persistentCacheValue;
@@ -233,7 +239,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                             this.getPerformanceInsight(requestTyped.id),
                             memoryCacheValue.result
                         ),
-                        dataSignature: this.writeSignature(memoryCacheValue.result)
+                        dataSignature: this.writeSignature(memoryCacheValue.result),
+                        fetchType: requestTyped.fetchType
                     });
                     this.deletePerformanceInsight(requestTyped.id);
                     return memoryCacheValue;
@@ -253,7 +260,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                                 this.getPerformanceInsight(requestTyped.id),
                                 value.data
                             ),
-                            dataSignature: this.writeSignature(value.data)
+                            dataSignature: this.writeSignature(value.data),
+                            fetchType: requestTyped.fetchType
                         });
                         this.deletePerformanceInsight(requestTyped.id);
                         return Promise.resolve({
@@ -277,7 +285,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
      * to fetch the new value. Fetch fast works better if most of the data (if not all) is stored with a persistence
      */
     public fetchFast<T>(request: AjaxRequest): Promise<DataResponse<T>> {
-        const requestTyped = this.setDefaultRequestId(request); // Default values
+        const requestTyped = this.setDefaultRequestValues(request, FetchType.Fast); // Default values
         this.setDefaultFastCache(requestTyped); // We enforce a minimum memory cache of few seconds
         this.startPerformanceInsight(requestTyped.id);
 
@@ -295,7 +303,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                             this.getPerformanceInsight(requestTyped.id),
                             response.result
                         ),
-                        dataSignature: this.writeSignature(response.result)
+                        dataSignature: this.writeSignature(response.result),
+                        fetchType: requestTyped.fetchType
                     });
                     return response;
                 }
@@ -322,7 +331,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                                         this.getPerformanceInsight(requestTyped.id),
                                         response.result
                                     ),
-                                    dataSignature: this.writeSignature(response.result)
+                                    dataSignature: this.writeSignature(response.result),
+                                    fetchType: requestTyped.fetchType
                                 });
                                 return response;
                             }
@@ -349,7 +359,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                                 this.getPerformanceInsight(requestTyped.id),
                                 persistentStorageEntry.payload
                             ),
-                            dataSignature: this.writeSignature(persistentStorageEntry.payload)
+                            dataSignature: this.writeSignature(persistentStorageEntry.payload),
+                            fetchType: requestTyped.fetchType
                         });
                         return Promise.resolve({
                             source: DataSource.PersistentStorageCache,
@@ -371,7 +382,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                     this.getPerformanceInsight(requestTyped.id),
                     memoryCacheEntry.payload
                 ),
-                dataSignature: this.writeSignature(memoryCacheEntry.payload)
+                dataSignature: this.writeSignature(memoryCacheEntry.payload),
+                fetchType: requestTyped.fetchType
             });
             return Promise.resolve({
                 source: DataSource.MemoryCache,
@@ -381,7 +393,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
     }
 
     public async fetchAndSaveInCacheIfExpired<T>(
-        requestTyped: AjaxRequestWithId,
+        requestTyped: AjaxRequestInternal,
         source: DataSource,
         cacheEntry?: CachedData<T> | undefined
     ): Promise<DataResponse<T>> {
@@ -397,7 +409,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                         url: requestTyped.request.url!,
                         source: DataSource.HttpRequest,
                         performanceInsight: this.getPerformanceInsight(requestTyped.id),
-                        dataSignature: this.writeSignature(value.data)
+                        dataSignature: this.writeSignature(value.data),
+                        fetchType: requestTyped.fetchType
                     });
                     return this.saveCache(requestTyped, {
                         source: DataSource.HttpRequest,
@@ -438,60 +451,60 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         );
     }
 
-    public setDefaultRequestId(request: AjaxRequest): AjaxRequestWithId {
+    public setDefaultRequestValues(request: AjaxRequest, fetchType: FetchType): AjaxRequestInternal {
         if (request.id === undefined) {
             request.id = this.generateId(request);
         }
-        return { id: request.id, ...request };
+        return { id: request.id, fetchType, ...request };
     }
 
-    public setDefaultCache(requestWithId: AjaxRequestWithId): void {
-        if (requestWithId.memoryCache === undefined && this.options.isCacheMandatoryIfEnabled) {
-            requestWithId.memoryCache = {
+    public setDefaultCache(requestInternal: AjaxRequestInternal): void {
+        if (requestInternal.memoryCache === undefined && this.options.isCacheMandatoryIfEnabled) {
+            requestInternal.memoryCache = {
                 lifespanInSeconds: this.options.defaultLifeSpanInSeconds
             }; // Provide ALWAYS a minimum memory cache with small life
         }
     }
-    public setDefaultFastCache(requestWithId: AjaxRequestWithId): void {
-        this.setDefaultCache(requestWithId);
-        if (requestWithId.persistentCache === undefined && this.options.isCacheMandatoryIfEnabled) {
-            requestWithId.persistentCache = {
+    public setDefaultFastCache(requestInternal: AjaxRequestInternal): void {
+        this.setDefaultCache(requestInternal);
+        if (requestInternal.persistentCache === undefined && this.options.isCacheMandatoryIfEnabled) {
+            requestInternal.persistentCache = {
                 lifespanInSeconds: this.options.defaultLifeSpanInSeconds
             }; // Provide ALWAYS a minimum memory cache with small life
         }
     }
 
     public saveCache<T>(
-        requestWithId: AjaxRequestWithId,
+        requestInternal: AjaxRequestInternal,
         responseFromCacheOrAjax: DataResponse<T>
     ): Promise<DataResponse<T>> {
         // At the end, we check if we need to store in any of the cache
-        if (requestWithId.memoryCache !== undefined) {
-            this.addInMemoryCache(requestWithId, responseFromCacheOrAjax.result);
+        if (requestInternal.memoryCache !== undefined) {
+            this.addInMemoryCache(requestInternal, responseFromCacheOrAjax.result);
         }
-        if (requestWithId.persistentCache !== undefined) {
+        if (requestInternal.persistentCache !== undefined) {
             const currentUTCDataWithLifeSpanAdded = new Date(
-                new Date().getTime() + requestWithId.persistentCache.lifespanInSeconds * 1000
+                new Date().getTime() + requestInternal.persistentCache.lifespanInSeconds * 1000
             );
             const cachedData: CachedData<T> = {
                 expirationDateTime: currentUTCDataWithLifeSpanAdded,
                 payload: responseFromCacheOrAjax.result
             };
-            this.addInPersistentStore(requestWithId.id, requestWithId.request.url!, cachedData);
+            this.addInPersistentStore(requestInternal, cachedData);
         }
         return Promise.resolve(responseFromCacheOrAjax);
     }
 
-    public tryMemoryCacheFetching<T>(requestWithId: AjaxRequestWithId): Promise<DataResponse<T> | undefined> {
-        if (this.options.isCacheEnabled === false || requestWithId.memoryCache === undefined) {
+    public tryMemoryCacheFetching<T>(requestInternal: AjaxRequestInternal): Promise<DataResponse<T> | undefined> {
+        if (this.options.isCacheEnabled === false || requestInternal.memoryCache === undefined) {
             return Promise.resolve(undefined);
         }
-        const cacheEntry: CachedData<T> | undefined = this.getMemoryStoreData(requestWithId);
+        const cacheEntry: CachedData<T> | undefined = this.getMemoryStoreData(requestInternal);
         if (cacheEntry !== undefined) {
             // If expired, fetch
             if (new Date().getTime() > new Date(cacheEntry.expirationDateTime).getTime()) {
                 // Delete from cache
-                this.deleteFromMemoryCache(requestWithId);
+                this.deleteFromMemoryCache(requestInternal);
             } else {
                 // Return the cached response
                 return Promise.resolve({
@@ -504,28 +517,29 @@ export class DataAccessSingleton implements IDataAccessSingleton {
     }
 
     public async tryPersistentStorageFetching<T>(
-        requestWithId: AjaxRequestWithId
+        requestInternal: AjaxRequestInternal
     ): Promise<DataResponse<T> | undefined> {
-        if (this.options.isCacheEnabled === false || requestWithId.persistentCache === undefined) {
+        if (this.options.isCacheEnabled === false || requestInternal.persistentCache === undefined) {
             return undefined;
         }
         try {
-            const persistentStorageValue = await this.getPersistentStoreData<T>(requestWithId);
+            const persistentStorageValue = await this.getPersistentStoreData<T>(requestInternal);
             if (persistentStorageValue !== undefined) {
                 const localStorageCacheEntry = persistentStorageValue;
                 if (new Date().getTime() > new Date(localStorageCacheEntry.expirationDateTime).getTime()) {
-                    this.deleteFromPersistentStorage(requestWithId);
+                    this.deleteFromPersistentStorage(requestInternal);
                 } else {
                     this.logInfo({
                         action: DataAction.Use,
-                        id: requestWithId.id,
-                        url: requestWithId.request.url!,
+                        id: requestInternal.id,
+                        url: requestInternal.request.url!,
                         source: DataSource.PersistentStorageCache,
                         performanceInsight: this.setDataSize(
-                            this.getPerformanceInsight(requestWithId.id),
+                            this.getPerformanceInsight(requestInternal.id),
                             localStorageCacheEntry.payload
                         ),
-                        dataSignature: this.writeSignature(localStorageCacheEntry.payload)
+                        dataSignature: this.writeSignature(localStorageCacheEntry.payload),
+                        fetchType: requestInternal.fetchType
                     });
                     return {
                         source: DataSource.PersistentStorageCache,
@@ -536,12 +550,12 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             return Promise.resolve(undefined);
         } catch (reason) {
             this.logError({
-                id: requestWithId.id,
-                url: requestWithId.request.url!,
+                id: requestInternal.id,
+                url: requestInternal.request.url!,
                 error: reason,
                 source: DataSource.PersistentStorageCache,
                 action: DataAction.Use,
-                performanceInsight: this.getPerformanceInsight(requestWithId.id)
+                performanceInsight: this.getPerformanceInsight(requestInternal.id)
             });
             return undefined;
         }
@@ -550,34 +564,34 @@ export class DataAccessSingleton implements IDataAccessSingleton {
     public ajax(request: AxiosRequestConfig): AxiosPromise<any> {
         return axios(request);
     }
-    public fetchWithAjax<T>(request: AjaxRequest): AxiosPromise<T> {
-        const requestWithId = this.setDefaultRequestId(request);
+    public fetchWithAjax<T>(requestInternal: AjaxRequestInternal): AxiosPromise<T> {
         // Check if already on-going request
-        const cacheOnGoingEntry: OnGoingAjaxRequest | undefined = this.onGoingAjaxRequest.get(requestWithId.id);
+        const cacheOnGoingEntry: OnGoingAjaxRequest | undefined = this.onGoingAjaxRequest.get(requestInternal.id);
         if (cacheOnGoingEntry === undefined) {
             // Execute Ajax call
             // Add listener to remove from onGoing once we receive a success or failure from the request
-            const promiseAjaxResponse = this.ajax(request.request)
+            const promiseAjaxResponse = this.ajax(requestInternal.request)
                 .then((response: AxiosResponse<T>) => {
-                    this.deleteOnGoingAjaxRequest(requestWithId.id, requestWithId.request.url!);
+                    this.deleteOnGoingAjaxRequest(requestInternal);
                     return response;
                 })
                 .catch(reason => {
-                    this.deleteOnGoingAjaxRequest(requestWithId.id, requestWithId.request.url!);
+                    this.deleteOnGoingAjaxRequest(requestInternal);
                     throw reason;
                 });
             // Add into the on-going queue
-            this.addOnGoingAjaxRequest(requestWithId, promiseAjaxResponse);
+            this.addOnGoingAjaxRequest(requestInternal, promiseAjaxResponse);
             return promiseAjaxResponse;
         } else {
             // Already on-going fetching, return the response promise from previous request.
             this.logInfo({
-                id: requestWithId.id,
-                url: requestWithId.request.url!,
+                id: requestInternal.id,
+                url: requestInternal.request.url!,
                 source: DataSource.HttpRequest,
                 action: DataAction.WaitingOnGoingRequest,
-                performanceInsight: this.getPerformanceInsight(requestWithId.id),
-                dataSignature: undefined
+                performanceInsight: this.getPerformanceInsight(requestInternal.id),
+                dataSignature: undefined,
+                fetchType: requestInternal.fetchType
             });
             return cacheOnGoingEntry.promise;
         }
@@ -692,53 +706,56 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         return insight;
     }
 
-    public deleteFromMemoryCache(requestWithId: AjaxRequestWithId): void {
-        const id = requestWithId.id;
-        const url = requestWithId.request.url!;
+    public deleteFromMemoryCache(requestInternal: AjaxRequestInternal): void {
+        const id = requestInternal.id;
+        const url = requestInternal.request.url!;
         this.logInfo({
             id: id,
             url: url,
             source: DataSource.MemoryCache,
             action: DataAction.Delete,
             performanceInsight: this.getPerformanceInsight(id),
-            dataSignature: undefined
+            dataSignature: undefined,
+            fetchType: requestInternal.fetchType
         });
         this.cachedResponse.delete(id);
     }
 
     public addOnGoingAjaxRequest<T>(
-        requestWithId: AjaxRequestWithId,
+        requestInternal: AjaxRequestInternal,
         promiseAjaxResponse: Promise<AxiosResponse<T>>
     ): void {
         this.logInfo({
-            id: requestWithId.id,
-            url: requestWithId.request.url!,
+            id: requestInternal.id,
+            url: requestInternal.request.url!,
             source: DataSource.HttpRequest,
             action: DataAction.AddFromOnGoingRequest,
-            performanceInsight: this.getPerformanceInsight(requestWithId.id),
-            dataSignature: undefined
+            performanceInsight: this.getPerformanceInsight(requestInternal.id),
+            dataSignature: undefined,
+            fetchType: requestInternal.fetchType
         });
-        this.onGoingAjaxRequest.set(requestWithId.id, {
-            ajaxRequest: requestWithId,
+        this.onGoingAjaxRequest.set(requestInternal.id, {
+            ajaxRequest: requestInternal,
             promise: promiseAjaxResponse
         });
     }
-    public deleteOnGoingAjaxRequest(id: string, url: string): void {
+    public deleteOnGoingAjaxRequest(requestInternal: AjaxRequestInternal): void {
         this.logInfo({
-            id: id,
-            url: url,
+            id: requestInternal.id,
+            url: requestInternal.request.url!,
             source: DataSource.HttpRequest,
             action: DataAction.RemoveFromOnGoingRequest,
-            performanceInsight: this.getPerformanceInsight(id),
-            dataSignature: undefined
+            performanceInsight: this.getPerformanceInsight(requestInternal.id),
+            dataSignature: undefined,
+            fetchType: requestInternal.fetchType
         });
-        this.onGoingAjaxRequest.delete(id);
+        this.onGoingAjaxRequest.delete(requestInternal.id);
     }
 
-    public addInMemoryCache<T>(requestWithId: AjaxRequestWithId, dataToAdd: T): void {
-        const id = requestWithId.id;
-        const url = requestWithId.request.url!;
-        const lifespanInSeconds = requestWithId.memoryCache!.lifespanInSeconds;
+    public addInMemoryCache<T>(requestInternal: AjaxRequestInternal, dataToAdd: T): void {
+        const id = requestInternal.id;
+        const url = requestInternal.request.url!;
+        const lifespanInSeconds = requestInternal.memoryCache!.lifespanInSeconds;
         const currentUTCDataWithLifeSpanAdded = new Date(new Date().getTime() + lifespanInSeconds * 1000);
         this.cachedResponse.set(
             id,
@@ -753,11 +770,14 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             source: DataSource.MemoryCache,
             action: DataAction.Save,
             performanceInsight: this.getPerformanceInsight(id),
-            dataSignature: this.writeSignature(dataToAdd)
+            dataSignature: this.writeSignature(dataToAdd),
+            fetchType: requestInternal.fetchType
         });
     }
 
-    public addInPersistentStore<T>(id: string, url: string, cacheData: CachedData<T>): void {
+    public addInPersistentStore<T>(requestInternal: AjaxRequestInternal, cacheData: CachedData<T>): void {
+        const id = requestInternal.id;
+        const url = requestInternal.request.url!;
         try {
             if (this.openIndexDb === undefined) {
                 return;
@@ -776,7 +796,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                                 source: DataSource.PersistentStorageCache,
                                 action: DataAction.Save,
                                 performanceInsight: this.getPerformanceInsight(id),
-                                dataSignature: this.writeSignature(cacheData.payload)
+                                dataSignature: this.writeSignature(cacheData.payload),
+                                fetchType: requestInternal.fetchType
                             });
                         })
                         .catch((e: any) => {
@@ -812,9 +833,9 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             });
         }
     }
-    public getMemoryStoreData<T>(requestWithId: AjaxRequestWithId): CachedData<T> | undefined {
-        const id = requestWithId.id;
-        const url = requestWithId.request.url!;
+    public getMemoryStoreData<T>(requestInternal: AjaxRequestInternal): CachedData<T> | undefined {
+        const id = requestInternal.id;
+        const url = requestInternal.request.url!;
         this.startPerformanceInsight(id, DataSource.MemoryCache);
         const cacheValue = this.cachedResponse.get(id);
         this.stopPerformanceInsight(id, DataSource.MemoryCache);
@@ -824,16 +845,19 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             url: url,
             source: DataSource.MemoryCache,
             performanceInsight: this.getPerformanceInsight(id),
-            dataSignature: this.writeSignature(cacheValue === undefined ? "" : JSON.parse(cacheValue))
+            dataSignature: this.writeSignature(cacheValue === undefined ? "" : JSON.parse(cacheValue)),
+            fetchType: requestInternal.fetchType
         });
         if (cacheValue === undefined) {
             return undefined;
         }
         return JSON.parse(cacheValue) as CachedData<T>;
     }
-    public async getPersistentStoreData<T>(requestWithId: AjaxRequestWithId): Promise<CacheDataWithId<T> | undefined> {
-        const id = requestWithId.id;
-        const url = requestWithId.request.url!;
+    public async getPersistentStoreData<T>(
+        requestInternal: AjaxRequestInternal
+    ): Promise<CacheDataWithId<T> | undefined> {
+        const id = requestInternal.id;
+        const url = requestInternal.request.url!;
         try {
             if (this.openIndexDb === undefined) {
                 return undefined;
@@ -847,7 +871,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 url: url,
                 source: DataSource.PersistentStorageCache,
                 performanceInsight: this.getPerformanceInsight(id),
-                dataSignature: this.writeSignature(resultPromise === undefined ? "" : resultPromise.payload)
+                dataSignature: this.writeSignature(resultPromise === undefined ? "" : resultPromise.payload),
+                fetchType: requestInternal.fetchType
             });
             return resultPromise;
         } catch (reason) {
@@ -864,9 +889,9 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         }
     }
 
-    public async deleteFromPersistentStorage(requestWithId: AjaxRequestWithId): Promise<void> {
-        const id = requestWithId.id;
-        const url = requestWithId.request.url!;
+    public async deleteFromPersistentStorage(requestInternal: AjaxRequestInternal): Promise<void> {
+        const id = requestInternal.id;
+        const url = requestInternal.request.url!;
         try {
             if (this.openIndexDb === undefined) {
                 return;
@@ -884,16 +909,16 @@ export class DataAccessSingleton implements IDataAccessSingleton {
     }
 
     public deleteDataFromCache(request: AjaxRequest, options?: DeleteCacheOptions): void {
-        const requestWithId = this.setDefaultRequestId(request); // Default values
+        const requestInternal = this.setDefaultRequestValues(request, FetchType.Fast); // Default values (Doesn't matter about "Fast" here)
         if (options === undefined) {
-            this.deleteFromMemoryCache(requestWithId);
-            this.deleteFromPersistentStorage(requestWithId);
+            this.deleteFromMemoryCache(requestInternal);
+            this.deleteFromPersistentStorage(requestInternal);
         } else {
             if (options.memory !== undefined && options.memory === true) {
-                this.deleteFromMemoryCache(requestWithId);
+                this.deleteFromMemoryCache(requestInternal);
             }
             if (options.persistent !== undefined && options.persistent === true) {
-                this.deleteFromPersistentStorage(requestWithId);
+                this.deleteFromPersistentStorage(requestInternal);
             }
         }
     }

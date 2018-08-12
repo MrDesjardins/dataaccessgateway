@@ -1,5 +1,5 @@
 import { AxiosRequestConfig } from "../node_modules/axios";
-import { AjaxRequest, AjaxRequestWithId, OnGoingAjaxRequest } from "../src/model";
+import { AjaxRequest, AjaxRequestInternal, FetchType, OnGoingAjaxRequest } from "../src/model";
 
 export function getMockAxiosRequestConfig(): AxiosRequestConfig {
     return {
@@ -13,9 +13,10 @@ export function getMockAjaxRequest(id: string): AjaxRequest {
     };
 }
 
-export function getMockAjaxRequestWithId(id: string): AjaxRequestWithId {
+export function getMockAjaxRequestWithId(id: string): AjaxRequestInternal {
     return {
         id: id,
+        fetchType: FetchType.Fast,
         request: getMockAxiosRequestConfig()
     };
 }

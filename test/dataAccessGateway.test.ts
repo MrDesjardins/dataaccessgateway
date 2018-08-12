@@ -1,8 +1,8 @@
 import { AxiosResponse } from "axios";
 import hash from "object-hash";
 import { DataAccessIndexDbDatabase, DataAccessSingleton, DeleteCacheOptions } from "../src/dataAccessGateway";
-import { AjaxRequest, AjaxRequestWithId, CacheConfiguration, CachedData, DataResponse, DataSource, FetchType, OnGoingAjaxRequest, PerformanceRequestInsight } from "../src/model";
-import { getMockAjaxRequest, getMockAjaxRequestWithId, getMockAxiosRequestConfig, getMockOnGoingAjaxRequest, getPromiseRetarder, PromiseRetarder } from "./dataAccessGateway.mock";
+import { AjaxRequest, AjaxRequestInternal, CacheConfiguration, CachedData, DataResponse, DataSource, FetchType, OnGoingAjaxRequest, PerformanceRequestInsight } from "../src/model";
+import { getMockAjaxRequestWithId, getMockAxiosRequestConfig, getMockOnGoingAjaxRequest, getPromiseRetarder, PromiseRetarder } from "./dataAccessGateway.mock";
 const DATABASE_NAME = "Test";
 interface FakeObject {
     id: string;
@@ -56,13 +56,13 @@ describe("DataAccessIndexDbDatabase", () => {
 describe("DataAccessSingleton", () => {
     let das: DataAccessSingleton;
     let request: AjaxRequest;
-    let requestWithId: AjaxRequestWithId;
+    let requestWithId: AjaxRequestInternal;
     let ajaxResponse: AxiosResponse<string>;
-    let spySetDefaultRequestId: jest.SpyInstance<(request: AjaxRequest) => void>;
+    let spySetDefaultRequestId: jest.SpyInstance<(request: AjaxRequest, fetchType: FetchType) => void>;
 
     beforeEach(() => {
         das = new DataAccessSingleton(DATABASE_NAME);
-        spySetDefaultRequestId = jest.spyOn(das, "setDefaultRequestId");
+        spySetDefaultRequestId = jest.spyOn(das, "setDefaultRequestValues");
         das.addInPersistentStore = jest.fn().mockRejectedValue("test");
         das.getPersistentStoreData = jest.fn().mockRejectedValue("test");
         das.deleteFromPersistentStorage = jest.fn().mockRejectedValue("test");
@@ -75,6 +75,7 @@ describe("DataAccessSingleton", () => {
         };
         requestWithId = {
             id: "id",
+            fetchType: FetchType.Fast,
             request: {
                 url: "http://request"
             }
@@ -107,6 +108,87 @@ describe("DataAccessSingleton", () => {
             });
         });
     });
+    describe("onListenMessage", () => {
+        let messageEvent: MessageEvent;
+        beforeEach(() => {
+            messageEvent = new MessageEvent("type");
+        });
+        describe("when message has no data", () => {
+            beforeEach(() => {
+                messageEvent = new MessageEvent("type", { data: undefined });
+            });
+            it("keeps default value of generateSignature to false", () => {
+                das.onListenMessage(messageEvent);
+                expect(das.generateSignature).toBeFalsy();
+            });
+        });
+        describe("when message has data", () => {
+            describe("when message has data source of DAG", () => {
+                describe("when message has the name of action", () => {
+                    describe("when message has the data id of signature", () => {
+                        beforeEach(() => {
+                            messageEvent = new MessageEvent("type", {
+                                data: {
+                                    source: "dataaccessgateway-devtools",
+                                    name: "action",
+                                    data: { id: "signature", value: true }
+                                }
+                            });
+                        });
+                        it("keeps default value of generateSignature to true", () => {
+                            das.onListenMessage(messageEvent);
+                            expect(das.generateSignature).toBeTruthy();
+                        });
+                    });
+                    describe("when message has NOT the data id of signature", () => {
+                        beforeEach(() => {
+                            messageEvent = new MessageEvent("type", {
+                                data: {
+                                    source: "dataaccessgateway-devtools",
+                                    name: "action",
+                                    data: { id: "NOT GOOD" }
+                                }
+                            });
+                        });
+                        it("keeps default value of generateSignature to false", () => {
+                            das.onListenMessage(messageEvent);
+                            expect(das.generateSignature).toBeFalsy();
+                        });
+                    });
+                });
+                describe("when message has the NOT the name of action", () => {
+                    beforeEach(() => {
+                        messageEvent = new MessageEvent("type", {
+                            data: {
+                                source: "dataaccessgateway-devtools",
+                                name: "NOT GOOD",
+                                data: { id: "signature" }
+                            }
+                        });
+                    });
+                    it("keeps default value of generateSignature to false", () => {
+                        das.onListenMessage(messageEvent);
+                        expect(das.generateSignature).toBeFalsy();
+                    });
+                });
+            });
+            describe("when message has NOT data source of DAG", () => {
+                beforeEach(() => {
+                    messageEvent = new MessageEvent("type", {
+                        data: {
+                            source: undefined,
+                            name: "action",
+                            data: { id: "signature" }
+                        }
+                    });
+                });
+                it("keeps default value of generateSignature to false", () => {
+                    das.onListenMessage(messageEvent);
+                    expect(das.generateSignature).toBeFalsy();
+                });
+            });
+        });
+    });
     describe("setConfiguration", () => {
         describe("empty options", () => {
             it("uses default option", () => {
@@ -131,7 +213,7 @@ describe("DataAccessSingleton", () => {
         });
     });
 
-    describe("setDefaultRequestId", () => {
+    describe("setDefaultRequestValues", () => {
         let request: AjaxRequest;
         beforeEach(() => {
             request = {
@@ -150,7 +232,7 @@ describe("DataAccessSingleton", () => {
                 };
             });
             it("keeps the id", () => {
-                das.setDefaultRequestId(request);
+                das.setDefaultRequestValues(request, FetchType.Fast);
                 expect(request.id).toBe("MyId");
             });
         });
@@ -169,7 +251,7 @@ describe("DataAccessSingleton", () => {
                     das.generateId = jest.fn();
                 });
                 it("sets an empty id", () => {
-                    das.setDefaultRequestId(request);
+                    das.setDefaultRequestValues(request, FetchType.Fast);
                     expect(das.generateId).toHaveBeenCalledTimes(1);
                 });
             });
@@ -178,7 +260,7 @@ describe("DataAccessSingleton", () => {
                     request.request.url = "http://test.com";
                 });
                 it("uses the whole request hashed has the id", () => {
-                    das.setDefaultRequestId(request);
+                    das.setDefaultRequestValues(request, FetchType.Fast);
                     expect(request.id).toEqual(hash.sha1(JSON.stringify(request.request)));
                 });
             });
@@ -273,7 +355,7 @@ describe("DataAccessSingleton", () => {
                 type = FetchType.Fast;
                 das.fetchFast = jest.fn();
             });
-            it("calls the fastFetch", ()=>{
+            it("calls the fastFetch", () => {
                 das.fetch(type, request);
                 expect(das.fetchFast).toHaveBeenCalledTimes(1);
             });
@@ -283,7 +365,7 @@ describe("DataAccessSingleton", () => {
                 type = FetchType.Fresh;
                 das.fetchFresh = jest.fn();
             });
-            it("calls the fastFresh", ()=>{
+            it("calls the fastFresh", () => {
                 das.fetch(type, request);
                 expect(das.fetchFresh).toHaveBeenCalledTimes(1);
             });
@@ -293,7 +375,7 @@ describe("DataAccessSingleton", () => {
                 type = FetchType.Web;
                 das.fetchWeb = jest.fn();
             });
-            it("calls the fastWeb", ()=>{
+            it("calls the fastWeb", () => {
                 das.fetch(type, request);
                 expect(das.fetchWeb).toHaveBeenCalledTimes(1);
             });
@@ -912,7 +994,7 @@ describe("DataAccessSingleton", () => {
         });
     });
     describe("addInMemoryCache", () => {
-        let requestWithId: AjaxRequestWithId;
+        let requestWithId: AjaxRequestInternal;
         beforeEach(() => {
             requestWithId = getMockAjaxRequestWithId("1");
             requestWithId.memoryCache = { lifespanInSeconds: 10 };
@@ -945,12 +1027,10 @@ describe("DataAccessSingleton", () => {
     describe("fetchWithAjax", () => {
         const requestId = "id1";
         const requestData = "data";
-        let request: AjaxRequest;
-        let requestWithId: AjaxRequestWithId;
+        let request: AjaxRequestInternal;
         let onGoingPromise: OnGoingAjaxRequest;
         beforeEach(() => {
-            request = getMockAjaxRequest(requestId);
-            requestWithId = getMockAjaxRequestWithId(requestId);
+            request = getMockAjaxRequestWithId(requestId);
             das.ajax = jest.fn().mockResolvedValue(request.request);
         });
         describe("when request is already on-going", () => {
@@ -1031,7 +1111,7 @@ describe("DataAccessSingleton", () => {
     });
 
     describe("deleteFromMemoryCache", () => {
-        let request: AjaxRequestWithId;
+        let request: AjaxRequestInternal;
         beforeEach(() => {
             request = getMockAjaxRequestWithId("id");
             das.cachedResponse.delete = jest.fn();
@@ -1043,11 +1123,17 @@ describe("DataAccessSingleton", () => {
     });
 
     describe("deleteonGoingAjaxRequest", () => {
+        let request: AjaxRequestInternal;
         beforeEach(() => {
             das.onGoingAjaxRequest.delete = jest.fn();
+            request = {
+                id: "id",
+                fetchType: FetchType.Fast,
+                request: {}
+            };
         });
         it("removes from on-going list", () => {
-            das.deleteOnGoingAjaxRequest("id", "");
+            das.deleteOnGoingAjaxRequest(request);
             expect(das.onGoingAjaxRequest.delete).toHaveBeenCalledTimes(1);
         });
     });
