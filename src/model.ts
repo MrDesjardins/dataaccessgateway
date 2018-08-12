@@ -1,9 +1,9 @@
 import { AxiosRequestConfig } from "axios";
 
-export enum FetchType{
+export enum FetchType {
     Fast = "Fast",
-    Fresh= "Fresh",
-    Web= "Web"
+    Fresh = "Fresh",
+    Web = "Web"
 }
 
 export interface CacheConfiguration {
