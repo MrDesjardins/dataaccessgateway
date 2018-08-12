@@ -193,77 +193,78 @@ export class DataAccessSingleton implements IDataAccessSingleton {
      * subsequent request will be faster. This function focus on accuracy first.
      */
     public fetchFresh<T>(request: AjaxRequest): Promise<DataResponse<T>> {
-        const requestTyped = this.setDefaultRequestValues(request, FetchType.Fresh); // Default values
-        this.setDefaultCache(requestTyped); // We enforce a minimum memory cache of few seconds
-        this.startPerformanceInsight(requestTyped.id);
-        return this.tryMemoryCacheFetching<T>(requestTyped)
+        const requestInternal = this.setDefaultRequestValues(request, FetchType.Fresh); // Default values
+        this.setDefaultCache(requestInternal); // We enforce a minimum memory cache of few seconds
+        this.startPerformanceInsight(requestInternal.id);
+        return this.tryMemoryCacheFetching<T>(requestInternal)
             .then((memoryCacheValue: DataResponse<T> | undefined) => {
                 if (memoryCacheValue === undefined) {
-                    return this.tryPersistentStorageFetching<T>(requestTyped)
+                    return this.tryPersistentStorageFetching<T>(requestInternal)
                         .then((persistentCacheValue: DataResponse<T> | undefined) => {
                             if (persistentCacheValue !== undefined) {
                                 this.logInfo({
                                     action: DataAction.Use,
-                                    id: requestTyped.id,
-                                    url: requestTyped.request.url!,
+                                    id: requestInternal.id,
+                                    url: requestInternal.request.url!,
                                     source: DataSource.PersistentStorageCache,
                                     performanceInsight: this.setDataSize(
-                                        this.getPerformanceInsight(requestTyped.id),
+                                        this.getPerformanceInsight(requestInternal.id),
                                         persistentCacheValue.result
                                     ),
                                     dataSignature: this.writeSignature(persistentCacheValue.result),
-                                    fetchType: requestTyped.fetchType
+                                    fetchType: requestInternal.fetchType
                                 });
                             }
                             return persistentCacheValue;
                         })
                         .catch((reason: any) => {
                             this.logError({
-                                id: requestTyped.id,
-                                url: requestTyped.request.url!,
+                                id: requestInternal.id,
+                                url: requestInternal.request.url!,
                                 error: reason,
                                 source: DataSource.PersistentStorageCache,
                                 action: DataAction.Fetch,
-                                performanceInsight: this.getPerformanceInsight(requestTyped.id)
+                                performanceInsight: this.getPerformanceInsight(requestInternal.id),
+                                fetchType: requestInternal.fetchType
                             });
                             return undefined;
                         });
                 } else {
-                    this.stopPerformanceInsight(requestTyped.id);
+                    this.stopPerformanceInsight(requestInternal.id);
                     this.logInfo({
                         action: DataAction.Use,
-                        id: requestTyped.id,
-                        url: requestTyped.request.url!,
+                        id: requestInternal.id,
+                        url: requestInternal.request.url!,
                         source: DataSource.MemoryCache,
                         performanceInsight: this.setDataSize(
-                            this.getPerformanceInsight(requestTyped.id),
+                            this.getPerformanceInsight(requestInternal.id),
                             memoryCacheValue.result
                         ),
                         dataSignature: this.writeSignature(memoryCacheValue.result),
-                        fetchType: requestTyped.fetchType
+                        fetchType: requestInternal.fetchType
                     });
-                    this.deletePerformanceInsight(requestTyped.id);
+                    this.deletePerformanceInsight(requestInternal.id);
                     return memoryCacheValue;
                 }
             })
             .then((memoryOrPersistentCacheValue: DataResponse<T> | undefined) => {
                 if (memoryOrPersistentCacheValue === undefined) {
-                    this.startPerformanceInsight(requestTyped.id, DataSource.HttpRequest);
-                    return this.fetchWithAjax<T>(requestTyped).then((value: AxiosResponse<T>) => {
-                        this.stopPerformanceInsight(requestTyped.id, DataSource.HttpRequest);
+                    this.startPerformanceInsight(requestInternal.id, DataSource.HttpRequest);
+                    return this.fetchWithAjax<T>(requestInternal).then((value: AxiosResponse<T>) => {
+                        this.stopPerformanceInsight(requestInternal.id, DataSource.HttpRequest);
                         this.logInfo({
                             action: DataAction.Use,
-                            id: requestTyped.id,
-                            url: requestTyped.request.url!,
+                            id: requestInternal.id,
+                            url: requestInternal.request.url!,
                             source: DataSource.HttpRequest,
                             performanceInsight: this.setDataSize(
-                                this.getPerformanceInsight(requestTyped.id),
+                                this.getPerformanceInsight(requestInternal.id),
                                 value.data
                             ),
                             dataSignature: this.writeSignature(value.data),
-                            fetchType: requestTyped.fetchType
+                            fetchType: requestInternal.fetchType
                         });
-                        this.deletePerformanceInsight(requestTyped.id);
+                        this.deletePerformanceInsight(requestInternal.id);
                         return Promise.resolve({
                             source: DataSource.HttpRequest,
                             result: value.data
@@ -273,7 +274,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 return Promise.resolve(memoryOrPersistentCacheValue);
             })
             .then((responseFromCacheOrAjax: DataResponse<T>) => {
-                return this.saveCache(requestTyped, responseFromCacheOrAjax);
+                return this.saveCache(requestInternal, responseFromCacheOrAjax);
             });
     }
 
@@ -393,26 +394,26 @@ export class DataAccessSingleton implements IDataAccessSingleton {
     }
 
     public async fetchAndSaveInCacheIfExpired<T>(
-        requestTyped: AjaxRequestInternal,
+        requestInternal: AjaxRequestInternal,
         source: DataSource,
         cacheEntry?: CachedData<T> | undefined
     ): Promise<DataResponse<T>> {
         if (cacheEntry === undefined || new Date().getTime() > new Date(cacheEntry.expirationDateTime).getTime()) {
             try {
-                this.startPerformanceInsight(requestTyped.id, DataSource.HttpRequest);
-                const value: AxiosResponse<T> = await this.fetchWithAjax<T>(requestTyped);
-                this.setDataSize(this.stopPerformanceInsight(requestTyped.id, DataSource.HttpRequest), value.data);
+                this.startPerformanceInsight(requestInternal.id, DataSource.HttpRequest);
+                const value: AxiosResponse<T> = await this.fetchWithAjax<T>(requestInternal);
+                this.setDataSize(this.stopPerformanceInsight(requestInternal.id, DataSource.HttpRequest), value.data);
                 if (value.status >= 200 && value.status <= 399) {
                     this.logInfo({
                         action: DataAction.Fetch,
-                        id: requestTyped.id,
-                        url: requestTyped.request.url!,
+                        id: requestInternal.id,
+                        url: requestInternal.request.url!,
                         source: DataSource.HttpRequest,
-                        performanceInsight: this.getPerformanceInsight(requestTyped.id),
+                        performanceInsight: this.getPerformanceInsight(requestInternal.id),
                         dataSignature: this.writeSignature(value.data),
-                        fetchType: requestTyped.fetchType
+                        fetchType: requestInternal.fetchType
                     });
-                    return this.saveCache(requestTyped, {
+                    return this.saveCache(requestInternal, {
                         source: DataSource.HttpRequest,
                         result: value.data
                     });
@@ -420,14 +421,15 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                     throw Error("Cannot cache request that are not in the range of 200 or in the range of 300.");
                 }
             } catch (error) {
-                this.stopPerformanceInsight(this.getPerformanceInsight(requestTyped.id), DataSource.HttpRequest);
+                this.stopPerformanceInsight(this.getPerformanceInsight(requestInternal.id), DataSource.HttpRequest);
                 this.logError({
-                    id: requestTyped.id,
-                    url: requestTyped.request.url!,
+                    id: requestInternal.id,
+                    url: requestInternal.request.url!,
                     error: error,
                     source: DataSource.HttpRequest,
                     action: DataAction.Fetch,
-                    performanceInsight: this.getPerformanceInsight(requestTyped.id)
+                    performanceInsight: this.getPerformanceInsight(requestInternal.id),
+                    fetchType: requestInternal.fetchType
                 });
                 throw error;
             }
@@ -451,11 +453,11 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         );
     }
 
-    public setDefaultRequestValues(request: AjaxRequest, fetchType: FetchType): AjaxRequestInternal {
+    public setDefaultRequestValues(request: AjaxRequest, fetchType?: FetchType): AjaxRequestInternal {
         if (request.id === undefined) {
             request.id = this.generateId(request);
         }
-        return { id: request.id, fetchType, ...request };
+        return { id: request.id, fetchType: fetchType, ...request };
     }
 
     public setDefaultCache(requestInternal: AjaxRequestInternal): void {
@@ -555,7 +557,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 error: reason,
                 source: DataSource.PersistentStorageCache,
                 action: DataAction.Use,
-                performanceInsight: this.getPerformanceInsight(requestInternal.id)
+                performanceInsight: this.getPerformanceInsight(requestInternal.id),
+                fetchType: requestInternal.fetchType
             });
             return undefined;
         }
@@ -807,7 +810,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                                 error: e,
                                 source: DataSource.PersistentStorageCache,
                                 action: DataAction.Save,
-                                performanceInsight: this.getPerformanceInsight(id)
+                                performanceInsight: this.getPerformanceInsight(id),
+                                fetchType: requestInternal.fetchType
                             });
                         });
                     return putPromise;
@@ -819,7 +823,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                         error: e,
                         source: DataSource.PersistentStorageCache,
                         action: DataAction.Save,
-                        performanceInsight: this.getPerformanceInsight(id)
+                        performanceInsight: this.getPerformanceInsight(id),
+                        fetchType: requestInternal.fetchType
                     });
                 });
         } catch (reason) {
@@ -829,7 +834,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 error: reason,
                 source: DataSource.PersistentStorageCache,
                 action: DataAction.Save,
-                performanceInsight: this.getPerformanceInsight(id)
+                performanceInsight: this.getPerformanceInsight(id),
+                fetchType: requestInternal.fetchType
             });
         }
     }
@@ -883,7 +889,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 error: reason,
                 source: DataSource.PersistentStorageCache,
                 action: DataAction.Fetch,
-                performanceInsight: this.getPerformanceInsight(id)
+                performanceInsight: this.getPerformanceInsight(id),
+                fetchType: requestInternal.fetchType
             });
             return undefined;
         }
@@ -903,13 +910,14 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 url: url,
                 error: reason,
                 source: DataSource.PersistentStorageCache,
-                action: DataAction.Delete
+                action: DataAction.Delete,
+                fetchType: requestInternal.fetchType
             });
         }
     }
 
     public deleteDataFromCache(request: AjaxRequest, options?: DeleteCacheOptions): void {
-        const requestInternal = this.setDefaultRequestValues(request, FetchType.Fast); // Default values (Doesn't matter about "Fast" here)
+        const requestInternal = this.setDefaultRequestValues(request, undefined); // Default values (Doesn't matter about "Fast" here)
         if (options === undefined) {
             this.deleteFromMemoryCache(requestInternal);
             this.deleteFromPersistentStorage(requestInternal);
