@@ -1,5 +1,11 @@
 import { AxiosRequestConfig } from "axios";
 
+export enum FetchType{
+    Fast = "Fast",
+    Fresh= "Fresh",
+    Web= "Web"
+}
+
 export interface CacheConfiguration {
     lifespanInSeconds: number;
 }

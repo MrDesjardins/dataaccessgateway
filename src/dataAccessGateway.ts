@@ -1,7 +1,7 @@
 import axios, { AxiosPromise, AxiosRequestConfig, AxiosResponse } from "axios";
 import Dexie from "dexie";
 import hash from "object-hash";
-import { AjaxRequest, AjaxRequestWithId, CacheDataWithId, CachedData, DataAction, DataResponse, DataSource, LogError, LogInfo, OnGoingAjaxRequest, PerformanceRequestInsight } from "./model";
+import { AjaxRequest, AjaxRequestWithId, CacheDataWithId, CachedData, DataAction, DataResponse, DataSource, FetchType, LogError, LogInfo, OnGoingAjaxRequest, PerformanceRequestInsight } from "./model";
 export class DataAccessIndexDbDatabase extends Dexie {
     public data!: Dexie.Table<CacheDataWithId<any>, string>; // Will be initialized later
 
@@ -35,6 +35,7 @@ export interface DataAccessSingletonOptions {
  */
 export interface IDataAccessSingleton {
     setConfiguration(options?: Partial<DataAccessSingletonOptions>): void;
+    fetch<T>(fetchType: FetchType, request: AjaxRequest): Promise<DataResponse<T>>;
     fetchFresh<T>(request: AjaxRequest): Promise<DataResponse<T>>;
     fetchFast<T>(request: AjaxRequest): Promise<DataResponse<T>>;
     fetchWeb<T>(request: AjaxRequest): Promise<DataResponse<T>>;
@@ -84,7 +85,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             });
         }
 
-        // Listen to message and scope down to only these coming from the DAG Chrome extension that 
+        // Listen to message and scope down to only these coming from the DAG Chrome extension that
         // is an action. For the data.id "signature" we use the value to turn on or off the generation
         // of a signature.
         window.addEventListener(
@@ -149,6 +150,16 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         }
     }
 
+    public fetch<T>(fetchType: FetchType, request: AjaxRequest): Promise<DataResponse<T>> {
+        switch (fetchType) {
+            case FetchType.Fast:
+                return this.fetchFast(request);
+            case FetchType.Fresh:
+                return this.fetchFresh(request);
+            case FetchType.Web:
+                return this.fetchWeb(request);
+        }
+    }
     public fetchWeb<T>(request: AjaxRequest): Promise<DataResponse<T>> {
         const requestTyped = this.setDefaultRequestId(request); // Default values
         this.startPerformanceInsight(requestTyped.id);

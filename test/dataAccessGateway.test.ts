@@ -1,7 +1,7 @@
 import { AxiosResponse } from "axios";
 import hash from "object-hash";
 import { DataAccessIndexDbDatabase, DataAccessSingleton, DeleteCacheOptions } from "../src/dataAccessGateway";
-import { AjaxRequest, AjaxRequestWithId, CacheConfiguration, CachedData, DataResponse, DataSource, OnGoingAjaxRequest, PerformanceRequestInsight } from "../src/model";
+import { AjaxRequest, AjaxRequestWithId, CacheConfiguration, CachedData, DataResponse, DataSource, FetchType, OnGoingAjaxRequest, PerformanceRequestInsight } from "../src/model";
 import { getMockAjaxRequest, getMockAjaxRequestWithId, getMockAxiosRequestConfig, getMockOnGoingAjaxRequest, getPromiseRetarder, PromiseRetarder } from "./dataAccessGateway.mock";
 const DATABASE_NAME = "Test";
 interface FakeObject {
@@ -255,6 +255,47 @@ describe("DataAccessSingleton", () => {
                     das.setDefaultFastCache(requestWithId);
                     expect(requestWithId.persistentCache).toBe(fastCache);
                 });
+            });
+        });
+    });
+    describe("fetch", () => {
+        let request: AjaxRequest;
+        let type: FetchType;
+        beforeEach(() => {
+            request = {
+                request: {
+                    url: "http://request"
+                }
+            };
+        });
+        describe("fast", () => {
+            beforeEach(() => {
+                type = FetchType.Fast;
+                das.fetchFast = jest.fn();
+            });
+            it("calls the fastFetch", ()=>{
+                das.fetch(type, request);
+                expect(das.fetchFast).toHaveBeenCalledTimes(1);
+            });
+        });
+        describe("fresh", () => {
+            beforeEach(() => {
+                type = FetchType.Fresh;
+                das.fetchFresh = jest.fn();
+            });
+            it("calls the fastFresh", ()=>{
+                das.fetch(type, request);
+                expect(das.fetchFresh).toHaveBeenCalledTimes(1);
+            });
+        });
+        describe("web", () => {
+            beforeEach(() => {
+                type = FetchType.Web;
+                das.fetchWeb = jest.fn();
+            });
+            it("calls the fastWeb", ()=>{
+                das.fetch(type, request);
+                expect(das.fetchWeb).toHaveBeenCalledTimes(1);
             });
         });
     });
