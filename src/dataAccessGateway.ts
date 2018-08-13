@@ -1,4 +1,4 @@
-import axios, { AxiosPromise, AxiosRequestConfig, AxiosResponse } from "axios";
+import axios, { AxiosResponse } from "axios";
 import Dexie from "dexie";
 import hash from "object-hash";
 import { AjaxRequest, AjaxRequestInternal, CacheDataWithId, CachedData, DataAction, DataResponse, DataSource, FetchType, LogError, LogInfo, OnGoingAjaxRequest, PerformanceRequestInsight } from "./model";
@@ -164,118 +164,150 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 return this.fetchWeb(request);
         }
     }
-    public fetchWeb<T>(request: AjaxRequest): Promise<DataResponse<T>> {
+    public async fetchWeb<T>(request: AjaxRequest): Promise<DataResponse<T>> {
         const requestTyped = this.setDefaultRequestValues(request, FetchType.Web); // Default values
         this.startPerformanceInsight(requestTyped.id);
-        return this.fetchAndSaveInCacheIfExpired<T>(requestTyped, DataSource.HttpRequest)
-            .then((response: DataResponse<T>) => {
-                this.stopPerformanceInsight(this.getPerformanceInsight(requestTyped.id));
-                this.logInfo({
-                    action: DataAction.Use,
-                    id: requestTyped.id,
-                    url: requestTyped.request.url!,
-                    source: DataSource.HttpRequest,
-                    performanceInsight: this.setDataSize(this.getPerformanceInsight(requestTyped.id), response.result),
-                    dataSignature: this.writeSignature(response.result),
-                    fetchType: requestTyped.fetchType
-                });
-                this.deletePerformanceInsight(requestTyped.id);
-                return response;
-            })
-            .catch((reason: any) => {
-                this.deletePerformanceInsight(requestTyped.id);
-                throw reason;
+        try {
+            const response: DataResponse<T> = await this.fetchAndSaveInCacheIfExpired<T>(
+                requestTyped,
+                DataSource.HttpRequest
+            );
+            this.stopPerformanceInsight(this.getPerformanceInsight(requestTyped.id));
+            this.logInfo({
+                action: DataAction.Use,
+                id: requestTyped.id,
+                url: requestTyped.request.url!,
+                source: DataSource.HttpRequest,
+                performanceInsight: this.setDataSize(this.getPerformanceInsight(requestTyped.id), response.result),
+                dataSignature: this.writeSignature(response.result),
+                fetchType: requestTyped.fetchType
             });
+            this.deletePerformanceInsight(requestTyped.id);
+            return response;
+        } catch (reason) {
+            this.deletePerformanceInsight(requestTyped.id);
+            throw reason;
+        }
     }
     /**
      * Go in the memory cache first, then the persisted cache. In all level of cache, if the data is outdated it will fetch and
      * wait the response to cache it and return it. It means that each time the data is obsolete that the fetch takes time but
      * subsequent request will be faster. This function focus on accuracy first.
      */
-    public fetchFresh<T>(request: AjaxRequest): Promise<DataResponse<T>> {
+    public async fetchFresh<T>(request: AjaxRequest): Promise<DataResponse<T>> {
         const requestInternal = this.setDefaultRequestValues(request, FetchType.Fresh); // Default values
         this.setDefaultCache(requestInternal); // We enforce a minimum memory cache of few seconds
-        this.startPerformanceInsight(requestInternal.id);
-        return this.tryMemoryCacheFetching<T>(requestInternal)
-            .then((memoryCacheValue: DataResponse<T> | undefined) => {
-                if (memoryCacheValue === undefined) {
-                    return this.tryPersistentStorageFetching<T>(requestInternal)
-                        .then((persistentCacheValue: DataResponse<T> | undefined) => {
-                            if (persistentCacheValue !== undefined) {
-                                this.logInfo({
-                                    action: DataAction.Use,
-                                    id: requestInternal.id,
-                                    url: requestInternal.request.url!,
-                                    source: DataSource.PersistentStorageCache,
-                                    performanceInsight: this.setDataSize(
-                                        this.getPerformanceInsight(requestInternal.id),
-                                        persistentCacheValue.result
-                                    ),
-                                    dataSignature: this.writeSignature(persistentCacheValue.result),
-                                    fetchType: requestInternal.fetchType
-                                });
-                            }
-                            return persistentCacheValue;
-                        })
-                        .catch((reason: any) => {
-                            this.logError({
-                                id: requestInternal.id,
-                                url: requestInternal.request.url!,
-                                error: reason,
-                                source: DataSource.PersistentStorageCache,
-                                action: DataAction.Fetch,
-                                performanceInsight: this.getPerformanceInsight(requestInternal.id),
-                                fetchType: requestInternal.fetchType
-                            });
-                            return undefined;
-                        });
-                } else {
-                    this.stopPerformanceInsight(requestInternal.id);
-                    this.logInfo({
-                        action: DataAction.Use,
-                        id: requestInternal.id,
-                        url: requestInternal.request.url!,
-                        source: DataSource.MemoryCache,
-                        performanceInsight: this.setDataSize(
-                            this.getPerformanceInsight(requestInternal.id),
-                            memoryCacheValue.result
-                        ),
-                        dataSignature: this.writeSignature(memoryCacheValue.result),
-                        fetchType: requestInternal.fetchType
-                    });
-                    this.deletePerformanceInsight(requestInternal.id);
-                    return memoryCacheValue;
-                }
-            })
-            .then((memoryOrPersistentCacheValue: DataResponse<T> | undefined) => {
-                if (memoryOrPersistentCacheValue === undefined) {
-                    this.startPerformanceInsight(requestInternal.id, DataSource.HttpRequest);
-                    return this.fetchWithAjax<T>(requestInternal).then((value: AxiosResponse<T>) => {
-                        this.stopPerformanceInsight(requestInternal.id, DataSource.HttpRequest);
-                        this.logInfo({
-                            action: DataAction.Use,
-                            id: requestInternal.id,
-                            url: requestInternal.request.url!,
-                            source: DataSource.HttpRequest,
-                            performanceInsight: this.setDataSize(
-                                this.getPerformanceInsight(requestInternal.id),
-                                value.data
-                            ),
-                            dataSignature: this.writeSignature(value.data),
-                            fetchType: requestInternal.fetchType
-                        });
-                        this.deletePerformanceInsight(requestInternal.id);
-                        return Promise.resolve({
-                            source: DataSource.HttpRequest,
-                            result: value.data
-                        });
-                    });
-                }
-                return Promise.resolve(memoryOrPersistentCacheValue);
-            })
-            .then((responseFromCacheOrAjax: DataResponse<T>) => {
-                return this.saveCache(requestInternal, responseFromCacheOrAjax);
+        this.startPerformanceInsight(requestInternal.id); // Full fetch performance
+        try {
+            this.startPerformanceInsight(requestInternal.id, DataSource.MemoryCache); // Performance for memory only
+            const memoryCacheValue: DataResponse<T> | undefined = await this.tryMemoryCacheFetching<T>(requestInternal);
+            this.stopPerformanceInsight(requestInternal.id, DataSource.MemoryCache); // Performance for memory only is stopped
+            if (memoryCacheValue !== undefined) {
+                this.stopPerformanceInsight(requestInternal.id); // Stop performance for the whole fetch
+                this.logInfo({
+                    action: DataAction.Use,
+                    id: requestInternal.id,
+                    url: requestInternal.request.url!,
+                    source: DataSource.MemoryCache,
+                    performanceInsight: this.setDataSize(
+                        this.getPerformanceInsight(requestInternal.id),
+                        memoryCacheValue.result
+                    ),
+                    dataSignature: this.writeSignature(memoryCacheValue.result),
+                    fetchType: requestInternal.fetchType
+                });
+                this.deletePerformanceInsight(requestInternal.id);
+                return this.saveCache(requestInternal, {
+                    source: DataSource.MemoryCache,
+                    result: memoryCacheValue.result
+                });
+            }
+        } catch (reason) {
+            this.deletePerformanceInsight(requestInternal.id);
+            this.logError({
+                id: requestInternal.id,
+                url: requestInternal.request.url!,
+                error: reason,
+                source: DataSource.MemoryCache,
+                action: DataAction.Fetch,
+                performanceInsight: this.getPerformanceInsight(requestInternal.id),
+                fetchType: requestInternal.fetchType
             });
+            throw reason;
+        }
+
+        try {
+            this.startPerformanceInsight(requestInternal.id, DataSource.PersistentStorageCache);
+            const persistentCacheValue: DataResponse<T> | undefined = await this.tryPersistentStorageFetching<T>(
+                requestInternal
+            );
+            this.stopPerformanceInsight(requestInternal.id, DataSource.PersistentStorageCache);
+            if (persistentCacheValue !== undefined) {
+                this.stopPerformanceInsight(requestInternal.id);
+                this.logInfo({
+                    action: DataAction.Use,
+                    id: requestInternal.id,
+                    url: requestInternal.request.url!,
+                    source: DataSource.PersistentStorageCache,
+                    performanceInsight: this.setDataSize(
+                        this.getPerformanceInsight(requestInternal.id),
+                        persistentCacheValue.result
+                    ),
+                    dataSignature: this.writeSignature(persistentCacheValue.result),
+                    fetchType: requestInternal.fetchType
+                });
+                this.deletePerformanceInsight(requestInternal.id);
+                return this.saveCache(requestInternal, {
+                    source: DataSource.PersistentStorageCache,
+                    result: persistentCacheValue.result
+                });
+            }
+        } catch (reason) {
+            this.deletePerformanceInsight(requestInternal.id);
+            this.logError({
+                id: requestInternal.id,
+                url: requestInternal.request.url!,
+                error: reason,
+                source: DataSource.PersistentStorageCache,
+                action: DataAction.Fetch,
+                performanceInsight: this.getPerformanceInsight(requestInternal.id),
+                fetchType: requestInternal.fetchType
+            });
+            throw reason;
+        }
+
+        try {
+            this.startPerformanceInsight(requestInternal.id, DataSource.HttpRequest);
+            const value: AxiosResponse<T> = await this.fetchWithAjax<T>(requestInternal);
+            this.stopPerformanceInsight(requestInternal.id, DataSource.HttpRequest);
+            this.stopPerformanceInsight(requestInternal.id);
+            this.logInfo({
+                action: DataAction.Use,
+                id: requestInternal.id,
+                url: requestInternal.request.url!,
+                source: DataSource.HttpRequest,
+                performanceInsight: this.setDataSize(this.getPerformanceInsight(requestInternal.id), value.data),
+                dataSignature: this.writeSignature(value.data),
+                fetchType: requestInternal.fetchType
+            });
+            this.deletePerformanceInsight(requestInternal.id);
+            return this.saveCache(requestInternal, {
+                source: DataSource.HttpRequest,
+                result: value.data
+            });
+        } catch (reason) {
+            // this.deletePerformanceInsight(requestInternal.id);
+            this.logError({
+                id: requestInternal.id,
+                url: requestInternal.request.url!,
+                error: reason,
+                source: DataSource.HttpRequest,
+                action: DataAction.Fetch,
+                performanceInsight: this.getPerformanceInsight(requestInternal.id),
+                fetchType: requestInternal.fetchType
+            });
+            throw reason;
+        }
     }
 
     /**
