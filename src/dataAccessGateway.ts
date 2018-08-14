@@ -1,4 +1,4 @@
-import axios, { AxiosResponse } from "axios";
+import axios, { AxiosPromise, AxiosRequestConfig, AxiosResponse } from "axios";
 import Dexie from "dexie";
 import hash from "object-hash";
 import { AjaxRequest, AjaxRequestInternal, CacheDataWithId, CachedData, DataAction, DataResponse, DataSource, FetchType, LogError, LogInfo, OnGoingAjaxRequest, PerformanceRequestInsight } from "./model";
@@ -349,17 +349,17 @@ export class DataAccessSingleton implements IDataAccessSingleton {
 
             if (persistentStorageValue === undefined) {
                 // Not in the persistent storage means we must fetch from API
-                const response: DataResponse<T> = await this.fetchAndSaveInCacheIfExpired<T>(requestTyped, DataSource.HttpRequest);
+                const response: DataResponse<T> = await this.fetchAndSaveInCacheIfExpired<T>(
+                    requestTyped,
+                    DataSource.HttpRequest
+                );
                 this.stopPerformanceInsight(requestTyped.id);
                 this.logInfo({
                     action: DataAction.Use,
                     id: requestTyped.id,
                     url: requestTyped.request.url!,
                     source: DataSource.HttpRequest,
-                    performanceInsight: this.setDataSize(
-                        this.getPerformanceInsight(requestTyped.id),
-                        response.result
-                    ),
+                    performanceInsight: this.setDataSize(this.getPerformanceInsight(requestTyped.id), response.result),
                     dataSignature: this.writeSignature(response.result),
                     fetchType: requestTyped.fetchType
                 });
@@ -802,7 +802,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         });
     }
 
-    public addInPersistentStore<T>(requestInternal: AjaxRequestInternal, cacheData: CachedData<T>): void {
+    public async addInPersistentStore<T>(requestInternal: AjaxRequestInternal, cacheData: CachedData<T>): void {
         const id = requestInternal.id;
         const url = requestInternal.request.url!;
         try {
@@ -814,31 +814,30 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                     if (this.openIndexDb === undefined) {
                         return;
                     }
-                    const putPromise = this.openIndexDb.data
-                        .put({ id: id, url: url, ...cacheData })
-                        .then(() => {
-                            this.logInfo({
-                                id: id,
-                                url: url,
-                                source: DataSource.PersistentStorageCache,
-                                action: DataAction.Save,
-                                performanceInsight: this.getPerformanceInsight(id),
-                                dataSignature: this.writeSignature(cacheData.payload),
-                                fetchType: requestInternal.fetchType
-                            });
-                        })
-                        .catch((e: any) => {
-                            this.logError({
-                                id: id,
-                                url: url,
-                                error: e,
-                                source: DataSource.PersistentStorageCache,
-                                action: DataAction.Save,
-                                performanceInsight: this.getPerformanceInsight(id),
-                                fetchType: requestInternal.fetchType
-                            });
+                    try {
+                        this.openIndexDb.data.put({ id: id, url: url, ...cacheData });
+                        this.logInfo({
+                            id: id,
+                            url: url,
+                            source: DataSource.PersistentStorageCache,
+                            action: DataAction.Save,
+                            performanceInsight: this.getPerformanceInsight(id),
+                            dataSignature: this.writeSignature(cacheData.payload),
+                            fetchType: requestInternal.fetchType
                         });
-                    return putPromise;
+                        return;
+                    } catch (e) {
+                        this.logError({
+                            id: id,
+                            url: url,
+                            error: e,
+                            source: DataSource.PersistentStorageCache,
+                            action: DataAction.Save,
+                            performanceInsight: this.getPerformanceInsight(id),
+                            fetchType: requestInternal.fetchType
+                        });
+                        throw e;
+                    }
                 })
                 .catch((e: any) => {
                     this.logError({
