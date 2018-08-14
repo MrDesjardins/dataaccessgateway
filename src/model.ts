@@ -6,6 +6,17 @@ export enum FetchType {
     Web = "Web",
     Execute = "Execute"
 }
+export enum HttpMethod {
+    GET = "GET",
+    HEAD = "HEAD",
+    POST = "POST",
+    PUT = "PUT",
+    DELETE = "DELETE",
+    CONNECT = "CONNECT",
+    OPTIONS = "OPTIONS",
+    TRACE = "TRACE",
+    PATCH = "PATCH"
+}
 
 export interface CacheConfiguration {
     lifespanInSeconds: number;
@@ -34,7 +45,7 @@ export interface AjaxRequest {
 export interface AjaxRequestInternal extends AjaxRequest {
     id: string;
     fetchType: FetchType | undefined;
-    httpMethod: string;
+    httpMethod: HttpMethod;
 }
 
 export interface CachedData<T> {
@@ -89,7 +100,7 @@ export interface LogBase {
     url: string;
     performanceInsight?: PerformanceRequestInsight;
     fetchType?: FetchType;
-    httpMethod: string;
+    httpMethod?: HttpMethod;
 }
 export interface LogError extends LogBase {
     kind: "LogError";

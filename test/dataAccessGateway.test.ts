@@ -1,7 +1,7 @@
 import { AxiosResponse } from "axios";
 import hash from "object-hash";
 import { DataAccessIndexDbDatabase, DataAccessSingleton, DeleteCacheOptions } from "../src/dataAccessGateway";
-import { AjaxRequest, AjaxRequestInternal, CacheConfiguration, CachedData, DataResponse, DataSource, FetchType, OnGoingAjaxRequest, PerformanceRequestInsight } from "../src/model";
+import { AjaxRequest, AjaxRequestInternal, CacheConfiguration, CachedData, DataResponse, DataSource, FetchType, HttpMethod, OnGoingAjaxRequest, PerformanceRequestInsight } from "../src/model";
 import { PromiseRetarder, getMockAjaxRequestWithId, getMockAxiosRequestConfig, getMockOnGoingAjaxRequest, getPromiseRetarder } from "./dataAccessGateway.mock";
 const DATABASE_NAME = "Test";
 interface FakeObject {
@@ -79,7 +79,7 @@ describe("DataAccessSingleton", () => {
             request: {
                 url: "http://request"
             },
-            httpMethod: "GET"
+            httpMethod: HttpMethod.GET
         };
         ajaxResponse = {
             status: 200,
@@ -1195,7 +1195,7 @@ describe("DataAccessSingleton", () => {
                 id: "id",
                 fetchType: FetchType.Fast,
                 request: {},
-                httpMethod: "GET"
+                httpMethod: HttpMethod.GET
             };
         });
         it("removes from on-going list", () => {

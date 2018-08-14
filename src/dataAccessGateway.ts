@@ -1,7 +1,7 @@
 import axios, { AxiosPromise, AxiosRequestConfig, AxiosResponse } from "axios";
 import Dexie from "dexie";
 import hash from "object-hash";
-import { AjaxRequest, AjaxRequestInternal, CacheDataWithId, CachedData, DataAction, DataResponse, DataSource, FetchType, LogError, LogInfo, OnGoingAjaxRequest, PerformanceRequestInsight } from "./model";
+import { AjaxRequest, AjaxRequestInternal, CacheDataWithId, CachedData, DataAction, DataResponse, DataSource, FetchType, HttpMethod, LogError, LogInfo, OnGoingAjaxRequest, PerformanceRequestInsight } from "./model";
 export class DataAccessIndexDbDatabase extends Dexie {
     public data!: Dexie.Table<CacheDataWithId<any>, string>; // Will be initialized later
 
@@ -84,7 +84,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 action: DataAction.System,
                 source: DataSource.System,
                 error: e,
-                httpMethod: ""
+                httpMethod: undefined
             });
         }
 
@@ -499,7 +499,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         if (request.id === undefined) {
             request.id = this.generateId(request);
         }
-        return { id: request.id, fetchType: fetchType, httpMethod: request.request.method || "", ...request };
+        return { id: request.id, fetchType: fetchType, httpMethod: request.request.method as HttpMethod, ...request };
     }
 
     public setDefaultCache(requestInternal: AjaxRequestInternal): void {
@@ -1019,7 +1019,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 error: reason,
                 source: DataSource.PersistentStorageCache,
                 action: DataAction.System,
-                httpMethod: ""
+                httpMethod: undefined
             });
         }
     }
