@@ -34,6 +34,7 @@ export interface AjaxRequest {
 export interface AjaxRequestInternal extends AjaxRequest {
     id: string;
     fetchType: FetchType | undefined;
+    httpMethod: string;
 }
 
 export interface CachedData<T> {
@@ -88,6 +89,7 @@ export interface LogBase {
     url: string;
     performanceInsight?: PerformanceRequestInsight;
     fetchType?: FetchType;
+    httpMethod: string;
 }
 export interface LogError extends LogBase {
     kind: "LogError";

@@ -78,7 +78,8 @@ describe("DataAccessSingleton", () => {
             fetchType: FetchType.Fast,
             request: {
                 url: "http://request"
-            }
+            },
+            httpMethod: "GET"
         };
         ajaxResponse = {
             status: 200,
@@ -1193,7 +1194,8 @@ describe("DataAccessSingleton", () => {
             request = {
                 id: "id",
                 fetchType: FetchType.Fast,
-                request: {}
+                request: {},
+                httpMethod: "GET"
             };
         });
         it("removes from on-going list", () => {
