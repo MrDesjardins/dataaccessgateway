@@ -1,7 +1,7 @@
 import axios, { AxiosPromise, AxiosRequestConfig, AxiosResponse } from "axios";
 import Dexie from "dexie";
 import hash from "object-hash";
-import { AjaxRequest, AjaxRequestInternal, CacheDataWithId, CachedData, DataAction, DataResponse, DataSource, FetchType, LogError, LogInfo, OnGoingAjaxRequest, PerformanceRequestInsight } from "./model";
+import { AjaxRequest, AjaxRequestInternal, CacheDataWithId, CachedData, DataAction, DataResponse, DataSource, FetchType, LogError, OnGoingAjaxRequest, PerformanceRequestInsight, LogInfo } from "./model";
 export class DataAccessIndexDbDatabase extends Dexie {
     public data!: Dexie.Table<CacheDataWithId<any>, string>; // Will be initialized later
 
@@ -39,8 +39,9 @@ export interface IDataAccessSingleton {
     fetchFresh<T>(request: AjaxRequest): Promise<DataResponse<T>>;
     fetchFast<T>(request: AjaxRequest): Promise<DataResponse<T>>;
     fetchWeb<T>(request: AjaxRequest): Promise<DataResponse<T>>;
-    deleteDataFromCache(request: AjaxRequest, options?: DeleteCacheOptions): void;
+    deleteDataFromCache(request: AjaxRequest, options?: DeleteCacheOptions): Promise<void>;
     deletePersistentStorage(name: string): Promise<void>;
+    forceDeleteAndFetch<T>(request: AjaxRequest, options?: DeleteCacheOptions): Promise<DataResponse<T>>;
 }
 
 export interface DeleteCacheOptions {
@@ -802,7 +803,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         });
     }
 
-    public async addInPersistentStore<T>(requestInternal: AjaxRequestInternal, cacheData: CachedData<T>): void {
+    public async addInPersistentStore<T>(requestInternal: AjaxRequestInternal, cacheData: CachedData<T>): Promise<void> {
         const id = requestInternal.id;
         const url = requestInternal.request.url!;
         try {
@@ -926,7 +927,17 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             if (this.openIndexDb === undefined) {
                 return;
             }
-            return this.openIndexDb.data.delete(id);
+            const deleted = this.openIndexDb.data.delete(id);
+            this.logInfo({
+                id: id,
+                url: url,
+                source: DataSource.PersistentStorageCache,
+                action: DataAction.Delete,
+                performanceInsight: this.getPerformanceInsight(id),
+                dataSignature: undefined,
+                fetchType: requestInternal.fetchType
+            });
+            return deleted;
         } catch (reason) {
             this.logError({
                 id: id,
@@ -939,18 +950,27 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         }
     }
 
-    public deleteDataFromCache(request: AjaxRequest, options?: DeleteCacheOptions): void {
+    public async forceDeleteAndFetch<T>(request: AjaxRequest, options?: DeleteCacheOptions): Promise<DataResponse<T>>{
+        await this.deleteDataFromCache(request, options);
+        return await this.fetchWeb<T>(request);
+    }
+    public deleteDataFromCache(request: AjaxRequest, options?: DeleteCacheOptions): Promise<void> {
         const requestInternal = this.setDefaultRequestValues(request, undefined); // Default values (Doesn't matter about "Fast" here)
         if (options === undefined) {
             this.deleteFromMemoryCache(requestInternal);
-            this.deleteFromPersistentStorage(requestInternal);
+            return this.deleteFromPersistentStorage(requestInternal);
         } else {
+            let promise: Promise<void> | undefined = undefined;
             if (options.memory !== undefined && options.memory === true) {
                 this.deleteFromMemoryCache(requestInternal);
             }
             if (options.persistent !== undefined && options.persistent === true) {
-                this.deleteFromPersistentStorage(requestInternal);
+                promise = this.deleteFromPersistentStorage(requestInternal);
             }
+            if(promise === undefined){
+                promise = Promise.resolve();
+            }
+            return promise;
         }
     }
     public async deletePersistentStorage(name: string): Promise<void> {

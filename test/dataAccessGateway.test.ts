@@ -2,7 +2,7 @@ import { AxiosResponse } from "axios";
 import hash from "object-hash";
 import { DataAccessIndexDbDatabase, DataAccessSingleton, DeleteCacheOptions } from "../src/dataAccessGateway";
 import { AjaxRequest, AjaxRequestInternal, CacheConfiguration, CachedData, DataResponse, DataSource, FetchType, OnGoingAjaxRequest, PerformanceRequestInsight } from "../src/model";
-import { getMockAjaxRequestWithId, getMockAxiosRequestConfig, getMockOnGoingAjaxRequest, getPromiseRetarder, PromiseRetarder } from "./dataAccessGateway.mock";
+import { PromiseRetarder, getMockAjaxRequestWithId, getMockAxiosRequestConfig, getMockOnGoingAjaxRequest, getPromiseRetarder } from "./dataAccessGateway.mock";
 const DATABASE_NAME = "Test";
 interface FakeObject {
     id: string;
@@ -684,6 +684,27 @@ describe("DataAccessSingleton", () => {
         it("returns the response from the parameter", async () => {
             const result = await das.saveCache(requestWithId, response);
             expect(result).toBe(response);
+        });
+    });
+    describe("forceDeleteAndFetch", () => {
+        let request: AjaxRequest;
+        beforeEach(() => {
+            request = {
+                request: {
+                    url: "http://request"
+                }
+            };
+            das.setConfiguration({ isCacheEnabled: true });
+            das.deleteDataFromCache = jest.fn().mockResolvedValue(undefined);
+            das.fetchWeb = jest.fn().mockResolvedValue(undefined);
+        });
+        it("calls delete", async () => {
+            await das.forceDeleteAndFetch(request);
+            expect(das.deleteDataFromCache).toHaveBeenCalledTimes(1);
+        });
+        it("calls web", async () => {
+            await das.forceDeleteAndFetch(request);
+            expect(das.fetchWeb).toHaveBeenCalledTimes(1);
         });
     });
 
