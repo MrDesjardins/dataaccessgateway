@@ -341,6 +341,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 DataSource.HttpRequest
             );
             this.stopPerformanceInsight(requestInternal.id, DataSource.HttpRequest);
+            this.stopPerformanceInsight(requestInternal.id);
             this.logInfo({
                 action: DataAction.Use,
                 id: requestInternal.id,
@@ -1037,10 +1038,14 @@ export class DataAccessSingleton implements IDataAccessSingleton {
 
     public async execute<T>(request: AjaxRequest): Promise<DataResponse<T>> {
         const requestInternal = this.setDefaultRequestValues(request, FetchType.Execute); // Default values
+        console.warn("requestInternal START", requestInternal);
+        this.startPerformanceInsight(requestInternal.id);
         this.startPerformanceInsight(requestInternal.id, DataSource.HttpRequest);
         try {
             const response: AxiosResponse<T> = await this.fetchWithAjax<T>(requestInternal);
-            this.stopPerformanceInsight(this.getPerformanceInsight(requestInternal.id));
+            console.warn("requestInternal STOP", requestInternal);
+            this.stopPerformanceInsight(requestInternal.id, DataSource.HttpRequest);
+            this.stopPerformanceInsight(requestInternal.id);
             this.logInfo({
                 action: DataAction.Use,
                 id: requestInternal.id,
@@ -1057,7 +1062,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 result: response.data
             };
         } catch (error) {
-            this.stopPerformanceInsight(this.getPerformanceInsight(requestInternal.id), DataSource.HttpRequest);
+            this.stopPerformanceInsight(requestInternal.id, DataSource.HttpRequest);
+            this.stopPerformanceInsight(requestInternal.id);
             this.logError({
                 id: requestInternal.id,
                 url: requestInternal.request.url!,
