@@ -380,6 +380,16 @@ describe("DataAccessSingleton", () => {
                 expect(das.fetchWeb).toHaveBeenCalledTimes(1);
             });
         });
+        describe("execute", () => {
+            beforeEach(() => {
+                type = FetchType.Execute;
+                das.execute = jest.fn();
+            });
+            it("calls the execute", () => {
+                das.fetch(type, request);
+                expect(das.execute).toHaveBeenCalledTimes(1);
+            });
+        });
     });
 
     describe("fetchFast", () => {
@@ -706,6 +716,21 @@ describe("DataAccessSingleton", () => {
             await das.forceDeleteAndFetch(request);
             expect(das.fetchWeb).toHaveBeenCalledTimes(1);
         });
+        describe("calls web failed", () => {
+            beforeEach(() => {
+                request = {
+                    request: {
+                        url: "http://request"
+                    }
+                };
+                das.setConfiguration({ isCacheEnabled: true });
+                das.deleteDataFromCache = jest.fn().mockResolvedValue(undefined);
+                das.fetchWeb = jest.fn().mockRejectedValue("error");
+            });
+            it("calls web", async () => {
+                await expect(das.forceDeleteAndFetch(request)).rejects.toThrow();
+            });
+        });
     });
 
     describe("fetchFresh", () => {
@@ -766,6 +791,20 @@ describe("DataAccessSingleton", () => {
                 it("calls Ajax HTTP request", async () => {
                     await das.fetchFresh(request);
                     expect(das.fetchWithAjax).toHaveBeenCalledTimes(1);
+                });
+
+                describe("when Ajax fail", () => {
+                    beforeEach(() => {
+                        das.fetchWithAjax = jest.fn().mockRejectedValue("error");
+                    });
+                    it("throws an error", async () => {
+                        expect.assertions(1);
+                        try {
+                            await das.fetchFresh(request);
+                        } catch (e) {
+                            expect(e).toEqual("error");
+                        }
+                    });
                 });
             });
             describe("when value is in persistent cache", () => {

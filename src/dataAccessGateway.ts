@@ -1,7 +1,7 @@
 import axios, { AxiosPromise, AxiosRequestConfig, AxiosResponse } from "axios";
 import Dexie from "dexie";
 import hash from "object-hash";
-import { AjaxRequest, AjaxRequestInternal, CacheDataWithId, CachedData, DataAction, DataResponse, DataSource, FetchType, LogError, OnGoingAjaxRequest, PerformanceRequestInsight, LogInfo } from "./model";
+import { AjaxRequest, AjaxRequestInternal, CacheDataWithId, CachedData, DataAction, DataResponse, DataSource, FetchType, LogError, LogInfo, OnGoingAjaxRequest, PerformanceRequestInsight } from "./model";
 export class DataAccessIndexDbDatabase extends Dexie {
     public data!: Dexie.Table<CacheDataWithId<any>, string>; // Will be initialized later
 
@@ -42,6 +42,7 @@ export interface IDataAccessSingleton {
     deleteDataFromCache(request: AjaxRequest, options?: DeleteCacheOptions): Promise<void>;
     deletePersistentStorage(name: string): Promise<void>;
     forceDeleteAndFetch<T>(request: AjaxRequest, options?: DeleteCacheOptions): Promise<DataResponse<T>>;
+    execute<T>(request: AjaxRequest): Promise<DataResponse<T>>;
 }
 
 export interface DeleteCacheOptions {
@@ -163,6 +164,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 return this.fetchFresh(request);
             case FetchType.Web:
                 return this.fetchWeb(request);
+            case FetchType.Execute:
+                return this.execute(request);
         }
     }
     public async fetchWeb<T>(request: AjaxRequest): Promise<DataResponse<T>> {
@@ -281,7 +284,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             this.startPerformanceInsight(requestInternal.id, DataSource.HttpRequest);
             const value: AxiosResponse<T> = await this.fetchWithAjax<T>(requestInternal);
             this.stopPerformanceInsight(requestInternal.id, DataSource.HttpRequest);
-            this.stopPerformanceInsight(requestInternal.id);
+            this.stopPerformanceInsight(requestInternal.id); // Overall performance off
             this.logInfo({
                 action: DataAction.Use,
                 id: requestInternal.id,
@@ -803,7 +806,10 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         });
     }
 
-    public async addInPersistentStore<T>(requestInternal: AjaxRequestInternal, cacheData: CachedData<T>): Promise<void> {
+    public async addInPersistentStore<T>(
+        requestInternal: AjaxRequestInternal,
+        cacheData: CachedData<T>
+    ): Promise<void> {
         const id = requestInternal.id;
         const url = requestInternal.request.url!;
         try {
@@ -950,7 +956,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         }
     }
 
-    public async forceDeleteAndFetch<T>(request: AjaxRequest, options?: DeleteCacheOptions): Promise<DataResponse<T>>{
+    public async forceDeleteAndFetch<T>(request: AjaxRequest, options?: DeleteCacheOptions): Promise<DataResponse<T>> {
         await this.deleteDataFromCache(request, options);
         return await this.fetchWeb<T>(request);
     }
@@ -967,7 +973,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             if (options.persistent !== undefined && options.persistent === true) {
                 promise = this.deleteFromPersistentStorage(requestInternal);
             }
-            if(promise === undefined){
+            if (promise === undefined) {
                 promise = Promise.resolve();
             }
             return promise;
@@ -996,6 +1002,41 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             objToHash = this.options.alterObjectBeforeHashing(payload);
         }
         return hash.sha1(objToHash);
+    }
+
+    public async execute<T>(request: AjaxRequest): Promise<DataResponse<T>> {
+        const requestInternal = this.setDefaultRequestValues(request, FetchType.Execute); // Default values
+        this.startPerformanceInsight(requestInternal.id, DataSource.HttpRequest);
+        try {
+            const response: AxiosResponse<T> = await this.fetchWithAjax<T>(requestInternal);
+            this.stopPerformanceInsight(this.getPerformanceInsight(requestInternal.id));
+            this.logInfo({
+                action: DataAction.Use,
+                id: requestInternal.id,
+                url: requestInternal.request.url!,
+                source: DataSource.HttpRequest,
+                performanceInsight: this.setDataSize(this.getPerformanceInsight(requestInternal.id), response.data),
+                dataSignature: this.writeSignature(response.data),
+                fetchType: requestInternal.fetchType
+            });
+            this.deletePerformanceInsight(requestInternal.id);
+            return {
+                source: DataSource.HttpRequest,
+                result: response.data
+            };
+        } catch (error) {
+            this.stopPerformanceInsight(this.getPerformanceInsight(requestInternal.id), DataSource.HttpRequest);
+            this.logError({
+                id: requestInternal.id,
+                url: requestInternal.request.url!,
+                error: error,
+                source: DataSource.HttpRequest,
+                action: DataAction.Fetch,
+                performanceInsight: this.getPerformanceInsight(requestInternal.id),
+                fetchType: requestInternal.fetchType
+            });
+            throw error;
+        }
     }
 }
 const DataAccessGateway: (databaseName: string) => IDataAccessSingleton = (databaseName: string = "DatabaseName") =>
