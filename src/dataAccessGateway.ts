@@ -1038,12 +1038,10 @@ export class DataAccessSingleton implements IDataAccessSingleton {
 
     public async execute<T>(request: AjaxRequest): Promise<DataResponse<T>> {
         const requestInternal = this.setDefaultRequestValues(request, FetchType.Execute); // Default values
-        console.warn("requestInternal START", requestInternal);
         this.startPerformanceInsight(requestInternal.id);
         this.startPerformanceInsight(requestInternal.id, DataSource.HttpRequest);
         try {
             const response: AxiosResponse<T> = await this.fetchWithAjax<T>(requestInternal);
-            console.warn("requestInternal STOP", requestInternal);
             this.stopPerformanceInsight(requestInternal.id, DataSource.HttpRequest);
             this.stopPerformanceInsight(requestInternal.id);
             this.logInfo({
