@@ -404,7 +404,7 @@ describe("DataAccessSingleton", () => {
         describe("when cache disabled", () => {
             beforeEach(() => {
                 das.setConfiguration({ isCacheEnabled: false });
-                das.fetchAndSaveInCacheIfExpired = jest.fn().mockResolvedValue(undefined);
+                das.fetchAndSaveInCacheIfExpired = jest.fn().mockResolvedValue("fromMemory");
                 das.getMemoryStoreData = jest.fn();
                 das.getPersistentStoreData = jest.fn();
             });
@@ -419,6 +419,10 @@ describe("DataAccessSingleton", () => {
             it("does not invoke Persistent cache", () => {
                 das.fetchFast(request);
                 expect(das.getPersistentStoreData).toHaveBeenCalledTimes(0);
+            });
+            it("returns the memory", async() => {
+                const result = await das.fetchFast(request);
+                expect(result).toEqual("fromMemory");
             });
         });
         describe("when cache enabled", () => {
