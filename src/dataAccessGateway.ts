@@ -1,7 +1,7 @@
 import axios, { AxiosPromise, AxiosRequestConfig, AxiosResponse } from "axios";
 import Dexie from "dexie";
 import hash from "object-hash";
-import { AjaxRequest, AjaxRequestInternal, CacheDataWithId, CachedData, DataAction, DataResponse, DataSource, FetchType, HttpMethod, LogError, LogInfo, OnGoingAjaxRequest, PerformanceRequestInsight } from "./model";
+import { AjaxRequest, AjaxRequestInternal, AjaxRequestWithCache, CacheDataWithId, CachedData, DataAction, DataResponse, DataSource, FetchType, HttpMethod, LogError, LogInfo, OnGoingAjaxRequest, PerformanceRequestInsight } from "./model";
 export class DataAccessIndexDbDatabase extends Dexie {
     public data!: Dexie.Table<CacheDataWithId<any>, string>; // Will be initialized later
 
@@ -35,13 +35,13 @@ export interface DataAccessSingletonOptions {
  */
 export interface IDataAccessSingleton {
     setConfiguration(options?: Partial<DataAccessSingletonOptions>): void;
-    fetch<T>(fetchType: FetchType, request: AjaxRequest): Promise<DataResponse<T>>;
-    fetchFresh<T>(request: AjaxRequest): Promise<DataResponse<T>>;
-    fetchFast<T>(request: AjaxRequest): Promise<DataResponse<T>>;
-    fetchWeb<T>(request: AjaxRequest): Promise<DataResponse<T>>;
-    deleteDataFromCache(request: AjaxRequest, options?: DeleteCacheOptions): Promise<void>;
+    fetch<T>(fetchType: FetchType, request: AjaxRequestWithCache): Promise<DataResponse<T>>;
+    fetchFresh<T>(request: AjaxRequestWithCache): Promise<DataResponse<T>>;
+    fetchFast<T>(request: AjaxRequestWithCache): Promise<DataResponse<T>>;
+    fetchWeb<T>(request: AjaxRequestWithCache): Promise<DataResponse<T>>;
+    deleteDataFromCache(request: AjaxRequestWithCache, options?: DeleteCacheOptions): Promise<void>;
     deletePersistentStorage(name: string): Promise<void>;
-    forceDeleteAndFetch<T>(request: AjaxRequest, options?: DeleteCacheOptions): Promise<DataResponse<T>>;
+    forceDeleteAndFetch<T>(request: AjaxRequestWithCache, options?: DeleteCacheOptions): Promise<DataResponse<T>>;
     execute<T>(request: AjaxRequest): Promise<DataResponse<T>>;
 }
 
@@ -157,7 +157,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         }
     }
 
-    public fetch<T>(fetchType: FetchType, request: AjaxRequest): Promise<DataResponse<T>> {
+    public fetch<T>(fetchType: FetchType, request: AjaxRequestWithCache): Promise<DataResponse<T>> {
         switch (fetchType) {
             case FetchType.Fast:
                 return this.fetchFast(request);
@@ -169,7 +169,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 return this.execute(request);
         }
     }
-    public async fetchWeb<T>(request: AjaxRequest): Promise<DataResponse<T>> {
+    public async fetchWeb<T>(request: AjaxRequestWithCache): Promise<DataResponse<T>> {
         const requestInternal = this.setDefaultRequestValues(request, FetchType.Web); // Default values
         this.startPerformanceInsight(requestInternal.id);
         try {
@@ -200,7 +200,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
      * wait the response to cache it and return it. It means that each time the data is obsolete that the fetch takes time but
      * subsequent request will be faster. This function focus on accuracy first.
      */
-    public async fetchFresh<T>(request: AjaxRequest): Promise<DataResponse<T>> {
+    public async fetchFresh<T>(request: AjaxRequestWithCache): Promise<DataResponse<T>> {
         const requestInternal = this.setDefaultRequestValues(request, FetchType.Fresh); // Default values
         this.setDefaultCache(requestInternal); // We enforce a minimum memory cache of few seconds
         this.startPerformanceInsight(requestInternal.id); // Full fetch performance
@@ -329,7 +329,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
      * understand that the fetch fast principle is that it's better to return a stale value than nothing BUT will respect the lifespan
      * to fetch the new value. Fetch fast works better if most of the data (if not all) is stored with a persistence
      */
-    public async fetchFast<T>(request: AjaxRequest): Promise<DataResponse<T>> {
+    public async fetchFast<T>(request: AjaxRequestWithCache): Promise<DataResponse<T>> {
         const requestInternal = this.setDefaultRequestValues(request, FetchType.Fast); // Default values
         this.setDefaultFastCache(requestInternal); // We enforce a minimum memory cache of few seconds
         this.startPerformanceInsight(requestInternal.id);
@@ -482,7 +482,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             });
         }
     }
-    public generateId(request: AjaxRequest): string {
+    public generateId(request: AjaxRequestWithCache): string {
         return hash.sha1(
             JSON.stringify({
                 id: request.id,
@@ -495,7 +495,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         );
     }
 
-    public setDefaultRequestValues(request: AjaxRequest, fetchType?: FetchType): AjaxRequestInternal {
+    public setDefaultRequestValues(request: AjaxRequestWithCache, fetchType?: FetchType): AjaxRequestInternal {
         if (request.id === undefined) {
             request.id = this.generateId(request);
         }
@@ -986,11 +986,11 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         }
     }
 
-    public async forceDeleteAndFetch<T>(request: AjaxRequest, options?: DeleteCacheOptions): Promise<DataResponse<T>> {
+    public async forceDeleteAndFetch<T>(request: AjaxRequestWithCache, options?: DeleteCacheOptions): Promise<DataResponse<T>> {
         await this.deleteDataFromCache(request, options);
         return await this.fetchWeb<T>(request);
     }
-    public deleteDataFromCache(request: AjaxRequest, options?: DeleteCacheOptions): Promise<void> {
+    public deleteDataFromCache(request: AjaxRequestWithCache, options?: DeleteCacheOptions): Promise<void> {
         const requestInternal = this.setDefaultRequestValues(request, undefined); // Default values (Doesn't matter about "Fast" here)
         if (options === undefined) {
             this.deleteFromMemoryCache(requestInternal);

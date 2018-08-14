@@ -21,13 +21,15 @@ export enum HttpMethod {
 export interface CacheConfiguration {
     lifespanInSeconds: number;
 }
-
-export interface AjaxRequest {
+export interface AjaxRequest{
     /**
      * Identifier of the request. Need to be unique. If not provided, the hash of request is used
      */
     id?: string;
     request: AxiosRequestConfig;
+}
+export interface AjaxRequestWithCache extends AjaxRequest {
+
     /**
      * The memory cache configuration. It contains the lifespan before ejecting the data from the cache.
      * When not defined is set to X seconds (see constant in the class)
@@ -42,7 +44,7 @@ export interface AjaxRequest {
     persistentCache?: CacheConfiguration;
 }
 
-export interface AjaxRequestInternal extends AjaxRequest {
+export interface AjaxRequestInternal extends AjaxRequestWithCache {
     id: string;
     fetchType: FetchType | undefined;
     httpMethod: HttpMethod;

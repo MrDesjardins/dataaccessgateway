@@ -1,7 +1,7 @@
 import { AxiosResponse } from "axios";
 import hash from "object-hash";
 import { DataAccessIndexDbDatabase, DataAccessSingleton, DeleteCacheOptions } from "../src/dataAccessGateway";
-import { AjaxRequest, AjaxRequestInternal, CacheConfiguration, CachedData, DataResponse, DataSource, FetchType, HttpMethod, OnGoingAjaxRequest, PerformanceRequestInsight } from "../src/model";
+import { AjaxRequestInternal, AjaxRequestWithCache, CacheConfiguration, CachedData, DataResponse, DataSource, FetchType, HttpMethod, OnGoingAjaxRequest, PerformanceRequestInsight } from "../src/model";
 import { PromiseRetarder, getMockAjaxRequestWithId, getMockAxiosRequestConfig, getMockOnGoingAjaxRequest, getPromiseRetarder } from "./dataAccessGateway.mock";
 const DATABASE_NAME = "Test";
 interface FakeObject {
@@ -55,10 +55,10 @@ describe("DataAccessIndexDbDatabase", () => {
 });
 describe("DataAccessSingleton", () => {
     let das: DataAccessSingleton;
-    let request: AjaxRequest;
+    let request: AjaxRequestWithCache;
     let requestWithId: AjaxRequestInternal;
     let ajaxResponse: AxiosResponse<string>;
-    let spySetDefaultRequestId: jest.SpyInstance<(request: AjaxRequest, fetchType: FetchType) => void>;
+    let spySetDefaultRequestId: jest.SpyInstance<(request: AjaxRequestWithCache, fetchType: FetchType) => void>;
 
     beforeEach(() => {
         das = new DataAccessSingleton(DATABASE_NAME);
@@ -215,7 +215,7 @@ describe("DataAccessSingleton", () => {
     });
 
     describe("setDefaultRequestValues", () => {
-        let request: AjaxRequest;
+        let request: AjaxRequestWithCache;
         beforeEach(() => {
             request = {
                 request: {
@@ -342,7 +342,7 @@ describe("DataAccessSingleton", () => {
         });
     });
     describe("fetch", () => {
-        let request: AjaxRequest;
+        let request: AjaxRequestWithCache;
         let type: FetchType;
         beforeEach(() => {
             request = {
@@ -394,7 +394,7 @@ describe("DataAccessSingleton", () => {
     });
 
     describe("fetchFast", () => {
-        let request: AjaxRequest;
+        let request: AjaxRequestWithCache;
         beforeEach(() => {
             request = {
                 request: {
@@ -702,7 +702,7 @@ describe("DataAccessSingleton", () => {
         });
     });
     describe("forceDeleteAndFetch", () => {
-        let request: AjaxRequest;
+        let request: AjaxRequestWithCache;
         beforeEach(() => {
             request = {
                 request: {
@@ -739,7 +739,7 @@ describe("DataAccessSingleton", () => {
     });
 
     describe("fetchFresh", () => {
-        let request: AjaxRequest;
+        let request: AjaxRequestWithCache;
         beforeEach(() => {
             request = {
                 request: {
@@ -976,7 +976,7 @@ describe("DataAccessSingleton", () => {
             });
         });
         describe("deleteDataFromCache", () => {
-            let requestWithId: AjaxRequest;
+            let requestWithId: AjaxRequestWithCache;
             beforeEach(() => {
                 requestWithId = { id: "1", request: getMockAxiosRequestConfig() };
             });
@@ -1205,7 +1205,7 @@ describe("DataAccessSingleton", () => {
     });
 
     describe("fetchWeb", () => {
-        let request: AjaxRequest;
+        let request: AjaxRequestWithCache;
         beforeEach(() => {
             request = {
                 request: {
