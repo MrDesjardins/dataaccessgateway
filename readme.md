@@ -16,9 +16,9 @@ The goal of this library is to provide a tiny abstraction to cache data when per
 - Leverage Axios and Dexie libraries
 - Small footprint
 
-## Summary of the Two Modes
+## Summary of the functions
 
-There is two modes: two functions. This is simple as that. One focus on freshness and one focus on performance. In both case, by default the memory and persistent cache is enabled but you can turn off either of them. On top of the two modes, there is a `fetchWeb` which returns the response from the web without having any reading from caches.
+There are two principal modes: two functions. This is simple as that. One focus on freshness and one center on performance. In both case, by default, the memory and persistent cache are enabled, but you can turn off either of them. On top of the two modes, there is a `fetchWeb` which returns the response from the web without having any reading from caches.
 
 ### Fetch Fresh 
 The first one is called `fetchFresh` and checks the memory cache first. If the data is not present, it will fall into the persistent cache. If not present or out-of-date, it does the HTTP request and fill the caches. In the case of obsolete data, the fallback to the API request might take times and hence this function doesn't guarantee to be efficient when the life of the data is out. 
@@ -43,9 +43,17 @@ The fetch web is a side function that allows to always returns the response from
 
 ![alt text](https://github.com/MrDesjardins/dataaccessgateway/raw/master/images/fetchWebFlowDiagram.png "Fetch Web Flow Diagram")
 
+### Execute
+
+The execute function allows doing a direct Ajax call. Ideal for POST, PUT and DELETE ajax call. Executing a request through the `execute` function does not interfere with the cache. Neither before or after with the response. The library takes care of on-going request to avoid similar parallel queries at the same time and allows to have the log tools.
+
+### ForceDeleteAndFetch
+
+Once in a while, it is required to delete from the cache regardless of the remaining expiration set. The function `forceDeleteAndFetch` allows to delete from all caches (memory and persistence) and then fetch again in the background without having to worry about the response. The goal is to flush the caches and have a fresh version of the information in the caches once the data is back. A scenario when it can be useful is when a user saves new data in the backend by using the `execute` function. The cache will have wrong data.
+
 ## On-going HTTP Request
 
-In both cases, there is also a simple mechanism to avoid querying the same on-going request. If for example a request is performing a long fetch and many same query are requested, the subsequent queries will wait the former request response. This avoid having many similar query in queue.
+In all cases, there is also a simple mechanism to avoid querying the same on-going request. If for example a request is performing a long fetch and many same query are requested, the subsequent queries will wait the former request response. This avoid having many similar query in queue.
 
 ## Dependencies 
 This library depends on Axios for HTTP Request and on Dexie for IndexDb.
