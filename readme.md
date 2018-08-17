@@ -149,6 +149,24 @@ export function getPostEntityRequest(entity: YourEntity): AjaxRequestExecute {
 DataAccessGateway("AppName").execute(getPostEntityRequest({id:1}));
 ``` 
 
+Is is possible to not only invalidate but to force the library to fetch the invalidated request back. Forcing to delete and fetching will do more HTTP call but can be a good way to keep the cache warm with a fresh copy of data righ away. The `AjaxRequestExecute` has an optional parameter `forceInvalidateAndRefresh` that will delete from the cache and execute the HTTP request that will set back the value in the cache in respect of the requests' configuration.
+
+``` 
+// POST request
+export function getPostEntityRequest(entity: YourEntity): AjaxRequestExecute {
+    let requestConfig: AxiosRequestConfig = {
+        method: "POST",
+        url: `/api/entityName/${entity.id}`,
+        data: entity
+    };
+    return {
+        request: requestConfig,
+        invalidateRequests: [getEntityRequest(entity.id)],
+        forceInvalidateAndRefresh: true // <-- Will refresh the data by executing the request of getEntityRequest(entity.id)
+    };
+}
+``` 
+
 ## Signature
 It is possible to turn on the creation of payload signature. This is an experimental feature. It works in collaboration with the Chrome's extension which allow to turn to on the signature creation. Once it is done, the gateway library will generate a hash and share the hash with the data payload to the Chrome Extension. It should never been used in production because it has a huge impact in performance. The goal is to capture a unique signature on every payload to compare of something changed. The Chrome's extension can gather difference and give insight about the timing of specific endpoint change. To use the feature:
 

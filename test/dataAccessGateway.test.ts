@@ -232,14 +232,46 @@ describe("DataAccessSingleton", () => {
         describe("when invalidation requests setup", () => {
             beforeEach(() => {
                 das.deleteDataFromCache = jest.fn();
+                das.forceDeleteAndFetch = jest.fn();
             });
-            it("calls delete cache", () => {
-                das.invalidateRequests(requestWithDependencies);
-                expect(das.deleteDataFromCache).toBeCalled();
+            describe("when no refresh configuration defined", () => {
+                beforeEach(() => {
+                    requestWithDependencies.forceInvalidateAndRefresh = undefined;
+                });
+                it("calls delete cache", () => {
+                    das.invalidateRequests(requestWithDependencies);
+                    expect(das.deleteDataFromCache).toBeCalled();
+                });
+                it("calls delete cache for each caches", () => {
+                    das.invalidateRequests(requestWithDependencies);
+                    expect(das.deleteDataFromCache).toHaveBeenCalledTimes(2);
+                });
             });
-            it("calls delete cache for each caches", () => {
-                das.invalidateRequests(requestWithDependencies);
-                expect(das.deleteDataFromCache).toHaveBeenCalledTimes(2);
+            describe("when refresh configuration set to false", () => {
+                beforeEach(() => {
+                    requestWithDependencies.forceInvalidateAndRefresh = false;
+                });
+                it("calls delete cache", () => {
+                    das.invalidateRequests(requestWithDependencies);
+                    expect(das.deleteDataFromCache).toBeCalled();
+                });
+                it("calls delete cache for each caches", () => {
+                    das.invalidateRequests(requestWithDependencies);
+                    expect(das.deleteDataFromCache).toHaveBeenCalledTimes(2);
+                });
+            });
+            describe("when refresh configuration set to true", () => {
+                beforeEach(() => {
+                    requestWithDependencies.forceInvalidateAndRefresh = true;
+                });
+                it("calls forceDeleteAndFetch cache", () => {
+                    das.invalidateRequests(requestWithDependencies);
+                    expect(das.forceDeleteAndFetch).toBeCalled();
+                });
+                it("calls forceDeleteAndFetch cache for each caches", () => {
+                    das.invalidateRequests(requestWithDependencies);
+                    expect(das.forceDeleteAndFetch).toHaveBeenCalledTimes(2);
+                });
             });
         });
     });

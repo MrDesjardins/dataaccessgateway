@@ -67,7 +67,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         logInfo: () => {
             /*Nothing*/
         },
-        alterObjectBeforeHashing: undefined   
+        alterObjectBeforeHashing: undefined
     };
     public options: DataAccessSingletonOptions = this.DefaultOptions;
     public onGoingAjaxRequest: Map<string, OnGoingAjaxRequest> = new Map<string, OnGoingAjaxRequest>();
@@ -1087,9 +1087,13 @@ export class DataAccessSingleton implements IDataAccessSingleton {
 
     public invalidateRequests(request: AjaxRequestExecute): void {
         if (request.invalidateRequests !== undefined) {
-            request.invalidateRequests.forEach(request => {
-                this.deleteDataFromCache(request);
-            }); 
+            request.invalidateRequests.forEach(req => {
+                if (request.forceInvalidateAndRefresh === undefined || request.forceInvalidateAndRefresh === false) {
+                    this.deleteDataFromCache(req);
+                } else {
+                    this.forceDeleteAndFetch(req);
+                }
+            });
         }
     }
 }

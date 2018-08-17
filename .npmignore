@@ -8,3 +8,5 @@ coverage
 images
 .travis.yml
 node_modules
+.vscode
+.prettierrc
