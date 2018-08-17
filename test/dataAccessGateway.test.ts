@@ -2,7 +2,7 @@ import { AxiosResponse } from "axios";
 import hash from "object-hash";
 import { DataAccessIndexDbDatabase, DataAccessSingleton, DeleteCacheOptions } from "../src/dataAccessGateway";
 import { AjaxRequestInternal, AjaxRequestWithCache, CacheConfiguration, CachedData, DataResponse, DataSource, FetchType, HttpMethod, OnGoingAjaxRequest, PerformanceRequestInsight } from "../src/model";
-import { PromiseRetarder, getMockAjaxRequestWithId, getMockAxiosRequestConfig, getMockOnGoingAjaxRequest, getPromiseRetarder } from "./dataAccessGateway.mock";
+import { PromiseRetarder, getMockAjaxRequest, getMockAjaxRequestExecute, getMockAjaxRequestWithId, getMockAxiosRequestConfig, getMockOnGoingAjaxRequest, getPromiseRetarder } from "./dataAccessGateway.mock";
 const DATABASE_NAME = "Test";
 interface FakeObject {
     id: string;
@@ -214,6 +214,35 @@ describe("DataAccessSingleton", () => {
         });
     });
 
+    describe("invalidateRequests", () => {
+        const requestWithoutDependencies = getMockAjaxRequestExecute("1");
+        const requestWithDependencies = getMockAjaxRequestExecute("1", [
+            getMockAjaxRequest("2"),
+            getMockAjaxRequest("3")
+        ]);
+        describe("when invalidation is undefined", () => {
+            beforeEach(() => {
+                das.deleteDataFromCache = jest.fn();
+            });
+            it("does NOT call delete cache", () => {
+                das.invalidateRequests(requestWithoutDependencies);
+                expect(das.deleteDataFromCache).not.toBeCalled();
+            });
+        });
+        describe("when invalidation requests setup", () => {
+            beforeEach(() => {
+                das.deleteDataFromCache = jest.fn();
+            });
+            it("calls delete cache", () => {
+                das.invalidateRequests(requestWithDependencies);
+                expect(das.deleteDataFromCache).toBeCalled();
+            });
+            it("calls delete cache for each caches", () => {
+                das.invalidateRequests(requestWithDependencies);
+                expect(das.deleteDataFromCache).toHaveBeenCalledTimes(2);
+            });
+        });
+    });
     describe("setDefaultRequestValues", () => {
         let request: AjaxRequestWithCache;
         beforeEach(() => {
@@ -421,7 +450,7 @@ describe("DataAccessSingleton", () => {
                 das.fetchFast(request);
                 expect(das.getPersistentStoreData).toHaveBeenCalledTimes(0);
             });
-            it("returns the memory", async() => {
+            it("returns the memory", async () => {
                 const result = await das.fetchFast(request);
                 expect(result).toEqual("fromMemory");
             });
@@ -546,6 +575,39 @@ describe("DataAccessSingleton", () => {
                     await das.fetchFast(request);
                     expect(das.saveCache).toHaveBeenCalledTimes(0);
                 });
+            });
+        });
+    });
+    describe("execute", () => {
+        let request = getMockAjaxRequest("1");
+        beforeEach(() => {
+            das.fetchWithAjax = jest.fn().mockResolvedValue(ajaxResponse);
+            das.invalidateRequests = jest.fn().mockResolvedValue(undefined);
+            das.saveCache = jest.fn();
+            request.id = "http://test";
+        });
+        it("fetchWithAjax once", async () => {
+            await das.execute(request);
+            expect(das.fetchWithAjax).toHaveBeenCalledTimes(1);
+        });
+        it("invalidate cache once", async () => {
+            await das.execute(request);
+            expect(das.invalidateRequests).toHaveBeenCalledTimes(1);
+        });
+        describe("when ajax fail", () => {
+            beforeEach(() => {
+                das.fetchWithAjax = jest.fn().mockRejectedValue("fail");
+                das.invalidateRequests = jest.fn().mockResolvedValue(undefined);
+                das.saveCache = jest.fn();
+                request.id = "http://test";
+            });
+            it("rejects promise", async () => {
+                expect.assertions(1);
+                try {
+                    await das.execute(request);
+                } catch (e) {
+                    expect(e).toEqual("fail");
+                }
             });
         });
     });

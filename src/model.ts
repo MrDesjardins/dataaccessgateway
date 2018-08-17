@@ -28,6 +28,9 @@ export interface AjaxRequest{
     id?: string;
     request: AxiosRequestConfig;
 }
+export interface AjaxRequestExecute extends AjaxRequest{
+    invalidateRequests?:AjaxRequest[];
+}
 export interface AjaxRequestWithCache extends AjaxRequest {
 
     /**

@@ -1,12 +1,12 @@
 import { AxiosRequestConfig } from "../node_modules/axios";
-import { AjaxRequestInternal, AjaxRequestWithCache, FetchType, OnGoingAjaxRequest } from "../src/model";
+import { AjaxRequest, AjaxRequestExecute, AjaxRequestInternal, AjaxRequestWithCache, FetchType, OnGoingAjaxRequest } from "../src/model";
 
 export function getMockAxiosRequestConfig(): AxiosRequestConfig {
     return {
         url: "http://url"
     };
 }
-export function getMockAjaxRequest(id: string): AjaxRequestWithCache {
+export function getMockAjaxRequestWithCache(id: string): AjaxRequestWithCache {
     return {
         id: id,
         request: getMockAxiosRequestConfig()
@@ -22,10 +22,25 @@ export function getMockAjaxRequestWithId(id: string): AjaxRequestInternal {
     };
 }
 
+export function getMockAjaxRequest(id: string): AjaxRequest {
+    return {
+        id: id,
+        request: getMockAxiosRequestConfig()
+    };
+}
+
 export function getMockOnGoingAjaxRequest(id: string, data: any): OnGoingAjaxRequest {
     return {
         ajaxRequest: getMockAjaxRequestWithId(id),
         promise: Promise.resolve(data)
+    };
+}
+
+export function getMockAjaxRequestExecute(id: string, requestsToInvalidate?: AjaxRequest[]): AjaxRequestExecute {
+    return {
+        id: id,
+        request: getMockAxiosRequestConfig(),
+        invalidateRequests: requestsToInvalidate
     };
 }
 

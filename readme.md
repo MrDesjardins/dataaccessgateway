@@ -12,9 +12,11 @@ The goal of this library is to provide a tiny abstraction to cache data when per
 - Improve your performance by reducing waiting moment with memory cache
 - Remove simultaneous identical HTTP requests
 - Reduce loading time of your single-page application by loading previous date from the browser's Index DB
-- Craft your request with Axios' request object, hence nothing new to learn
+- Reduce the bandwidth of your application by reducing data movement between the client and server side
+- Craft your request with Axios' request object, therefore nothing new to learn
 - Leverage Axios and Dexie libraries
 - Small footprint
+- Automatically invalidate cache on data execution
 
 ## Summary of the functions
 
@@ -45,7 +47,9 @@ The fetch web is a side function that allows to always returns the response from
 
 ### Execute
 
-The execute function allows doing a direct Ajax call. Ideal for POST, PUT and DELETE ajax call. Executing a request through the `execute` function does not interfere with the cache. Neither before or after with the response. The library takes care of on-going request to avoid similar parallel queries at the same time and allows to have the log tools.
+The execute function allows doing a direct Ajax call. Ideal for POST, PUT and DELETE ajax call. Executing a request through the `execute` function does not interfere with the cache. Neither before or after with the response. The library takes care of on-going request to avoid similar parallel queries at the same time and allows to have the log tools. 
+
+A last feature of execute is that the parameter of the function can take a reference to other request that need to be removed from all caches.
 
 ### ForceDeleteAndFetch
 
@@ -66,7 +70,7 @@ This is the most basic call. It uses many defaults. This will have a memory cach
 const request: AxiosRequestConfig = { method: "GET", url: url};
 
 // Execute the request through DataAccessGateway
-const promiseResult = DataAccessGateway.fetchFast<YourEntityResponse>({request: request});
+const promiseResult = DataAccessGateway("AppName").fetchFast<YourEntityResponse>({request: request});
 ``` 
 ### Configuration by request
 This example defines explicitly the requirement of having a memory cache of 1 minute and a persistent storage of 1 day. You can define per request the life span of the freshness of the data. After the threshold met, an Ajax call is made to get new data.
@@ -112,6 +116,39 @@ If you want to change the `5 minutes` default for anything else you can do it wi
 DataAccessGateway("AppName").setConfiguration({ defaultLifeSpanInSeconds: 120 });
 ``` 
 
+### Execute POST and invalidate a GET request
+Example that execute a request and invalidate automatically the cache of an other request
+
+``` 
+// GET request
+export function getEntityRequest(id:number): AjaxRequest {
+    let requestConfig: AxiosRequestConfig = {
+        method: "GET",
+        url: `/api/entityName/${entity.id}`
+    };
+    return {
+        request: requestConfig
+    };
+}
+
+// POST request
+export function getPostEntityRequest(entity: YourEntity): AjaxRequestExecute {
+    let requestConfig: AxiosRequestConfig = {
+        method: "POST",
+        url: `/api/entityName/${entity.id}`,
+        data: entity
+    };
+    return {
+        request: requestConfig,
+        invalidateRequests: [getEntityRequest(entity.id)]
+    };
+}
+
+// This will execute the POST, once the data is back from the backend will invalidate 
+// the cache provided in the the invalidateRequests
+DataAccessGateway("AppName").execute(getPostEntityRequest({id:1}));
+``` 
+
 ## Signature
 It is possible to turn on the creation of payload signature. This is an experimental feature. It works in collaboration with the Chrome's extension which allow to turn to on the signature creation. Once it is done, the gateway library will generate a hash and share the hash with the data payload to the Chrome Extension. It should never been used in production because it has a huge impact in performance. The goal is to capture a unique signature on every payload to compare of something changed. The Chrome's extension can gather difference and give insight about the timing of specific endpoint change. To use the feature:
 
@@ -126,9 +163,6 @@ DataAccessGateway("AppName")..setConfiguration({
 ```
 
 The code example has a `alterObjectBeforeHashing` give a change to alter the object before being hashed. The function is useful if you need to remove something that change all the time to an object or to remove a branch that can be time consuming to hash. A normal use case is to remove a property that is changing all the time from the API like the last time generated time the data was built by the API which could be different on every call.
-
-## Todo List:
-- Increase Unit Tests
 
 ## Chrome Extension
 There is an [open-source Chrome extension](https://github.com/MrDesjardins/dataaccessgatewaychromeextension) that allows to get insight from the library.

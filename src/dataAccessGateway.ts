@@ -1,7 +1,7 @@
 import axios, { AxiosPromise, AxiosRequestConfig, AxiosResponse } from "axios";
 import Dexie from "dexie";
 import hash from "object-hash";
-import { AjaxRequest, AjaxRequestInternal, AjaxRequestWithCache, CacheDataWithId, CachedData, DataAction, DataResponse, DataSource, FetchType, HttpMethod, LogError, LogInfo, OnGoingAjaxRequest, PerformanceRequestInsight } from "./model";
+import { AjaxRequest, AjaxRequestExecute, AjaxRequestInternal, AjaxRequestWithCache, CacheDataWithId, CachedData, DataAction, DataResponse, DataSource, FetchType, HttpMethod, LogError, LogInfo, OnGoingAjaxRequest, PerformanceRequestInsight } from "./model";
 export class DataAccessIndexDbDatabase extends Dexie {
     public data!: Dexie.Table<CacheDataWithId<any>, string>; // Will be initialized later
 
@@ -39,10 +39,10 @@ export interface IDataAccessSingleton {
     fetchFresh<T>(request: AjaxRequestWithCache): Promise<DataResponse<T>>;
     fetchFast<T>(request: AjaxRequestWithCache): Promise<DataResponse<T>>;
     fetchWeb<T>(request: AjaxRequestWithCache): Promise<DataResponse<T>>;
-    deleteDataFromCache(request: AjaxRequestWithCache, options?: DeleteCacheOptions): Promise<void>;
+    deleteDataFromCache(request: AjaxRequest, options?: DeleteCacheOptions): Promise<void>;
     deletePersistentStorage(name: string): Promise<void>;
     forceDeleteAndFetch<T>(request: AjaxRequestWithCache, options?: DeleteCacheOptions): Promise<DataResponse<T>>;
-    execute<T>(request: AjaxRequest): Promise<DataResponse<T>>;
+    execute<T>(request: AjaxRequestExecute): Promise<DataResponse<T>>;
 }
 
 export interface DeleteCacheOptions {
@@ -67,7 +67,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         logInfo: () => {
             /*Nothing*/
         },
-        alterObjectBeforeHashing: undefined
+        alterObjectBeforeHashing: undefined   
     };
     public options: DataAccessSingletonOptions = this.DefaultOptions;
     public onGoingAjaxRequest: Map<string, OnGoingAjaxRequest> = new Map<string, OnGoingAjaxRequest>();
@@ -359,7 +359,9 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         const memoryCacheEntry: CachedData<T> | undefined = this.getMemoryStoreData(requestInternal);
         if (memoryCacheEntry === undefined) {
             // Not in memory, check in long term storage
-            const persistentStorageValue: CachedData<{}> | undefined = await this.getPersistentStoreData(requestInternal);
+            const persistentStorageValue: CachedData<{}> | undefined = await this.getPersistentStoreData(
+                requestInternal
+            );
 
             if (persistentStorageValue === undefined) {
                 // Not in the persistent storage means we must fetch from API
@@ -373,7 +375,10 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                     id: requestInternal.id,
                     url: requestInternal.request.url!,
                     source: DataSource.HttpRequest,
-                    performanceInsight: this.setDataSize(this.getPerformanceInsight(requestInternal.id), response.result),
+                    performanceInsight: this.setDataSize(
+                        this.getPerformanceInsight(requestInternal.id),
+                        response.result
+                    ),
                     dataSignature: this.writeSignature(response.result),
                     fetchType: requestInternal.fetchType,
                     httpMethod: requestInternal.httpMethod
@@ -496,7 +501,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         );
     }
 
-    public setDefaultRequestValues(request: AjaxRequestWithCache, fetchType?: FetchType): AjaxRequestInternal {
+    public setDefaultRequestValues(request: AjaxRequest, fetchType?: FetchType): AjaxRequestInternal {
         if (request.id === undefined) {
             request.id = this.generateId(request);
         }
@@ -987,11 +992,14 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         }
     }
 
-    public async forceDeleteAndFetch<T>(request: AjaxRequestWithCache, options?: DeleteCacheOptions): Promise<DataResponse<T>> {
+    public async forceDeleteAndFetch<T>(
+        request: AjaxRequestWithCache,
+        options?: DeleteCacheOptions
+    ): Promise<DataResponse<T>> {
         await this.deleteDataFromCache(request, options);
         return await this.fetchWeb<T>(request);
     }
-    public deleteDataFromCache(request: AjaxRequestWithCache, options?: DeleteCacheOptions): Promise<void> {
+    public deleteDataFromCache(request: AjaxRequest, options?: DeleteCacheOptions): Promise<void> {
         const requestInternal = this.setDefaultRequestValues(request, undefined); // Default values (Doesn't matter about "Fast" here)
         if (options === undefined) {
             this.deleteFromMemoryCache(requestInternal);
@@ -1036,7 +1044,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         return hash.sha1(objToHash);
     }
 
-    public async execute<T>(request: AjaxRequest): Promise<DataResponse<T>> {
+    public async execute<T>(request: AjaxRequestExecute): Promise<DataResponse<T>> {
         const requestInternal = this.setDefaultRequestValues(request, FetchType.Execute); // Default values
         this.startPerformanceInsight(requestInternal.id);
         this.startPerformanceInsight(requestInternal.id, DataSource.HttpRequest);
@@ -1055,6 +1063,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 httpMethod: requestInternal.httpMethod
             });
             this.deletePerformanceInsight(requestInternal.id);
+            this.invalidateRequests(request);
             return {
                 source: DataSource.HttpRequest,
                 result: response.data
@@ -1073,6 +1082,14 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 httpMethod: requestInternal.httpMethod
             });
             throw error;
+        }
+    }
+
+    public invalidateRequests(request: AjaxRequestExecute): void {
+        if (request.invalidateRequests !== undefined) {
+            request.invalidateRequests.forEach(request => {
+                this.deleteDataFromCache(request);
+            }); 
         }
     }
 }
