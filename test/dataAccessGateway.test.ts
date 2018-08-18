@@ -452,6 +452,11 @@ describe("DataAccessSingleton", () => {
     });
 
     describe("fetchFast", () => {
+        beforeEach(()=>{
+            das.addInPersistentStore = jest.fn().mockRejectedValue("addInPersistentStoreFail");
+            das.getPersistentStoreData = jest.fn().mockRejectedValue("getPersistentStoreDataFail");
+            das.deleteFromPersistentStorage = jest.fn().mockRejectedValue("deleteFromPersistentStorageFail");
+        });
         let request: AjaxRequestWithCache;
         beforeEach(() => {
             request = {
