@@ -1,6 +1,5 @@
 import axios, { AxiosPromise, AxiosRequestConfig, AxiosResponse } from "axios";
 import Dexie from "dexie";
-import hash from "object-hash";
 import { AjaxRequest, AjaxRequestExecute, AjaxRequestInternal, AjaxRequestWithCache, CacheDataWithId, CachedData, DataAction, DataResponse, DataSource, FetchType, HttpMethod, LogError, LogInfo, OnGoingAjaxRequest, PerformanceRequestInsight } from "./model";
 export class DataAccessIndexDbDatabase extends Dexie {
     public data!: Dexie.Table<CacheDataWithId<any>, string>; // Will be initialized later
@@ -489,7 +488,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         }
     }
     public generateId(request: AjaxRequestWithCache): string {
-        return hash.sha1(
+        return this.hashCode(
             JSON.stringify({
                 id: request.id,
                 params: request.request.params,
@@ -964,10 +963,12 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         const id = requestInternal.id;
         const url = requestInternal.request.url!;
         try {
+           
             if (this.openIndexDb === undefined) {
                 return;
             }
-            const deleted = this.openIndexDb.data.delete(id);
+          
+            const deleted = await this.openIndexDb.data.delete(id);
             this.logInfo({
                 id: id,
                 url: url,
@@ -989,6 +990,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 fetchType: requestInternal.fetchType,
                 httpMethod: requestInternal.httpMethod
             });
+            throw reason;
         }
     }
 
@@ -1030,6 +1032,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 action: DataAction.System,
                 httpMethod: undefined
             });
+            throw reason;
         }
     }
 
@@ -1041,7 +1044,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         if (this.options.alterObjectBeforeHashing) {
             objToHash = this.options.alterObjectBeforeHashing(payload);
         }
-        return hash.sha1(objToHash);
+        return this.hashCode(objToHash);
     }
 
     public async execute<T>(request: AjaxRequestExecute): Promise<DataResponse<T>> {
@@ -1095,6 +1098,21 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 }
             });
         }
+    }
+
+    public hashCode(toHash: string | object): string {
+        let str: string;
+        if (typeof toHash === "string") {
+            str = toHash;
+        } else {
+            str = JSON.stringify(toHash);
+        }
+        let res = 0;
+        let len = str.length;
+        for (var i = 0; i < len; i++) {
+            res = res * 31 + str.charCodeAt(i);
+        }
+        return res.toString();
     }
 }
 const DataAccessGateway: (databaseName: string) => IDataAccessSingleton = (databaseName: string = "DatabaseName") =>

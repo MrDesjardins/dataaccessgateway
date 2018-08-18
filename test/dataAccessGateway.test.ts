@@ -1,8 +1,8 @@
 import { AxiosResponse } from "axios";
-import hash from "object-hash";
+import { Dexie } from "dexie";
 import { DataAccessIndexDbDatabase, DataAccessSingleton, DeleteCacheOptions } from "../src/dataAccessGateway";
 import { AjaxRequestInternal, AjaxRequestWithCache, CacheConfiguration, CachedData, DataResponse, DataSource, FetchType, HttpMethod, OnGoingAjaxRequest, PerformanceRequestInsight } from "../src/model";
-import { PromiseRetarder, getMockAjaxRequest, getMockAjaxRequestExecute, getMockAjaxRequestWithId, getMockAxiosRequestConfig, getMockOnGoingAjaxRequest, getPromiseRetarder } from "./dataAccessGateway.mock";
+import { PromiseRetarder, getMockAjaxRequest, getMockAjaxRequestExecute, getMockAjaxRequestInternal, getMockAjaxRequestWithId, getMockAxiosRequestConfig, getMockOnGoingAjaxRequest, getPromiseRetarder } from "./dataAccessGateway.mock";
 const DATABASE_NAME = "Test";
 interface FakeObject {
     id: string;
@@ -63,9 +63,6 @@ describe("DataAccessSingleton", () => {
     beforeEach(() => {
         das = new DataAccessSingleton(DATABASE_NAME);
         spySetDefaultRequestId = jest.spyOn(das, "setDefaultRequestValues");
-        das.addInPersistentStore = jest.fn().mockRejectedValue("test");
-        das.getPersistentStoreData = jest.fn().mockRejectedValue("test");
-        das.deleteFromPersistentStorage = jest.fn().mockRejectedValue("test");
         das.options.logInfo = jest.fn();
         das.options.logError = jest.fn();
         request = {
@@ -323,7 +320,7 @@ describe("DataAccessSingleton", () => {
                 });
                 it("uses the whole request hashed has the id", () => {
                     das.setDefaultRequestValues(request, FetchType.Fast);
-                    expect(request.id).toEqual(hash.sha1(JSON.stringify(request.request)));
+                    expect(request.id).toEqual(das.hashCode(JSON.stringify(request.request)));
                 });
             });
         });
@@ -843,8 +840,8 @@ describe("DataAccessSingleton", () => {
             das.setConfiguration({ isCacheEnabled: true });
             das.setDefaultCache = jest.fn();
             das.fetchAndSaveInCacheIfExpired = jest.fn();
-            das.tryMemoryCacheFetching = jest.fn().mockRejectedValue("test");
-            das.tryPersistentStorageFetching = jest.fn().mockRejectedValue("test");
+            das.tryMemoryCacheFetching = jest.fn().mockRejectedValue("tryMemoryCacheFetchingFail");
+            das.tryPersistentStorageFetching = jest.fn().mockRejectedValue("tryPersistentStorageFetchingFail");
             das.fetchWithAjax = jest.fn().mockResolvedValue(ajaxResponse);
             das.saveCache = jest.fn().mockResolvedValue(cacheDataNotExpired);
         });
@@ -1076,8 +1073,8 @@ describe("DataAccessSingleton", () => {
             });
             describe("when no option", () => {
                 beforeEach(() => {
-                    das.deleteFromMemoryCache = jest.fn().mockRejectedValue("test");
-                    das.deleteFromPersistentStorage = jest.fn().mockRejectedValue("test");
+                    das.deleteFromMemoryCache = jest.fn().mockRejectedValue("deleteFromMemoryCacheFail");
+                    das.deleteFromPersistentStorage = jest.fn().mockRejectedValue("deleteFromPersistentStorageFail");
                 });
                 it("removes it from the memory cache", () => {
                     das.deleteDataFromCache(requestWithId);
@@ -1090,8 +1087,8 @@ describe("DataAccessSingleton", () => {
             });
             describe("when option", () => {
                 beforeEach(() => {
-                    das.deleteFromMemoryCache = jest.fn().mockRejectedValue("test");
-                    das.deleteFromPersistentStorage = jest.fn().mockRejectedValue("test");
+                    das.deleteFromMemoryCache = jest.fn().mockRejectedValue("deleteFromMemoryCacheFail");
+                    das.deleteFromPersistentStorage = jest.fn().mockRejectedValue("deleteFromPersistentStorageFail");
                 });
                 describe("when memory option only", () => {
                     let options: DeleteCacheOptions;
@@ -1310,7 +1307,7 @@ describe("DataAccessSingleton", () => {
             das.setDefaultCache = jest.fn();
             das.deletePerformanceInsight = jest.fn();
             das.fetchAndSaveInCacheIfExpired = jest.fn().mockResolvedValue(ajaxResponse);
-            das.tryMemoryCacheFetching = jest.fn().mockRejectedValue("test");
+            das.tryMemoryCacheFetching = jest.fn().mockRejectedValue("tryMemoryCacheFetchingFail");
         });
         it("always call the default request id configuration", () => {
             das.fetchWeb(request);
@@ -1591,11 +1588,11 @@ describe("DataAccessSingleton", () => {
                     });
                     it("hashes the object but does not return the hash of the full object", () => {
                         const result = das.writeSignature({ a: 1, b: 2 });
-                        expect(result).not.toEqual(hash.sha1({ a: 1, b: 2 }));
+                        expect(result).not.toEqual(das.hashCode({ a: 1, b: 2 }));
                     });
                     it("hashes the returned object of the function", () => {
                         const result = das.writeSignature({ a: 1, b: 2 });
-                        expect(result).toEqual(hash.sha1({ a: 1 }));
+                        expect(result).toEqual(das.hashCode({ a: 1 }));
                     });
                 });
                 describe("when alter function is undefined", () => {
@@ -1604,7 +1601,7 @@ describe("DataAccessSingleton", () => {
                     });
                     it("hashes the object", () => {
                         const result = das.writeSignature({ a: 1, b: 2 });
-                        expect(result).toEqual(hash.sha1({ a: 1, b: 2 }));
+                        expect(result).toEqual(das.hashCode({ a: 1, b: 2 }));
                     });
                 });
             });
@@ -1653,7 +1650,88 @@ describe("DataAccessSingleton", () => {
 
     // });
 
-    // describe("deleteFromPersistentStorage", () => {
+    describe("deletePersistentStorage", () => {
+        describe("when successful", () => {
+            beforeEach(() => {
+                Dexie.delete = jest.fn().mockResolvedValue({});
+            });
+            it("returns a completed promise", async () => {
+                expect.assertions(1);
+                try {
+                    await das.deletePersistentStorage("1");
+                    expect(true).toEqual(true);
+                } catch (e) {}
+            });
+        });
+        describe("when fail", async () => {
+            beforeEach(() => {
+                Dexie.delete = jest.fn().mockRejectedValue({});
+                das.logError = jest.fn();
+            });
+            it("throws", async () => {
+                expect.assertions(1);
+                try {
+                    await das.deletePersistentStorage("1");
+                } catch (e) {
+                    expect(e).toBeDefined();
+                }
+            });
+            it("calls logerror", async () => {
+                try {
+                    await das.deletePersistentStorage("1");
+                } catch (e) {}
+                expect(das.logError).toHaveBeenCalledTimes(1);
+            });
+        });
+    });
 
-    // });
+    describe("deleteFromPersistentStorage", () => {
+        describe("indexdb not instantiated", () => {
+            beforeEach(() => {
+                das.openIndexDb = undefined;
+            });
+            it("returns a void promise", async () => {
+                expect.assertions(1);
+                try {
+                    das.openIndexDb = undefined;
+                    await das.deleteFromPersistentStorage(getMockAjaxRequestInternal(""));
+                    expect(true).toBeTruthy();
+                } catch (e) {
+                    expect(e).toBeUndefined();
+                }
+            });
+        });
+        describe("indexdb defined", () => {
+            beforeEach(() => {
+                das.openIndexDb = new DataAccessIndexDbDatabase("testDB");
+                das.openIndexDb.data.delete = jest.fn().mockResolvedValue("");
+            });
+            it("delete it from the indexdb", async () => {
+                await das.deleteFromPersistentStorage(getMockAjaxRequestInternal("1"));
+                expect(das.openIndexDb.data.delete).toHaveBeenCalledTimes(1);
+            });
+            describe("it fails deleting from the indexdb", () => {
+                beforeEach(() => {
+                    das.openIndexDb = new DataAccessIndexDbDatabase("testDB");
+                    das.openIndexDb.data.delete = jest.fn().mockRejectedValue("");
+                    das.logError = jest.fn();
+                });
+                it("calls logerrors", async () => {
+                    try {
+                        await das.deleteFromPersistentStorage(getMockAjaxRequestInternal("1"));
+                    } catch (e) {
+                    }
+                    expect(das.logError).toHaveBeenCalledTimes(1);
+                });
+                it("throws", async () => {
+                    expect.assertions(1);
+                    try {
+                        await das.deleteFromPersistentStorage(getMockAjaxRequestInternal("1"));
+                    } catch (e) {
+                        expect(e).toBeDefined();
+                    }
+                });
+            });
+        });
+    });
 });
