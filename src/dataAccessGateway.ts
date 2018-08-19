@@ -335,35 +335,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
 
         // If the flag is off, we skip and go directly to the Ajax
         if (!this.options.isCacheEnabled) {
-            const response: DataResponse<T> = await this.fetchAndSaveInCacheIfExpired<T>(
-                requestInternal,
-                DataSource.HttpRequest
-            );
-            this.stopPerformanceInsight(requestInternal.id, DataSource.HttpRequest);
-            this.stopPerformanceInsight(requestInternal.id);
-            this.logInfo({
-                action: DataAction.Use,
-                id: requestInternal.id,
-                url: requestInternal.request.url!,
-                source: DataSource.HttpRequest,
-                performanceInsight: this.setDataSize(this.getPerformanceInsight(requestInternal.id), response.result),
-                dataSignature: this.writeSignature(response.result),
-                fetchType: requestInternal.fetchType,
-                httpMethod: requestInternal.httpMethod
-            });
-            return response;
-        }
-
-        // Check memory cache first
-        const memoryCacheEntry: CachedData<T> | undefined = this.getMemoryStoreData(requestInternal);
-        if (memoryCacheEntry === undefined) {
-            // Not in memory, check in long term storage
-            const persistentStorageValue: CachedData<{}> | undefined = await this.getPersistentStoreData(
-                requestInternal
-            );
-
-            if (persistentStorageValue === undefined) {
-                // Not in the persistent storage means we must fetch from API
+            try {
                 const response: DataResponse<T> = await this.fetchAndSaveInCacheIfExpired<T>(
                     requestInternal,
                     DataSource.HttpRequest
@@ -383,9 +355,66 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                     httpMethod: requestInternal.httpMethod
                 });
                 return response;
+            } catch (error) {
+                this.stopPerformanceInsight(requestInternal.id);
+                this.logError({
+                    id: requestInternal.id,
+                    url: requestInternal.request.url!,
+                    error: error,
+                    source: DataSource.HttpRequest,
+                    action: DataAction.Fetch,
+                    performanceInsight: this.getPerformanceInsight(requestInternal.id),
+                    fetchType: requestInternal.fetchType,
+                    httpMethod: requestInternal.httpMethod
+                });
+                throw error;
+            }
+        }
+
+        // Check memory cache first
+        const memoryCacheEntry: CachedData<T> | undefined = this.getMemoryStoreData(requestInternal);
+        if (memoryCacheEntry === undefined) {
+            let persistentStorageValue: CachedData<T> | undefined = undefined;
+            // Not in memory, check in long term storage
+            try {
+                persistentStorageValue = await this.getPersistentStoreData<T>(
+                    requestInternal
+                );
+            } catch (error) {
+                this.stopPerformanceInsight(requestInternal.id);
+                // We do not log error because the function getPersistentStoreData is already covering the persistence error log
+                throw error;
+            }
+            if (persistentStorageValue === undefined) {
+                // Not in the persistent storage means we must fetch from API
+                try{
+                    const response: DataResponse<T> = await this.fetchAndSaveInCacheIfExpired<T>(
+                        requestInternal,
+                        DataSource.HttpRequest
+                    );
+                    this.stopPerformanceInsight(requestInternal.id);
+                    this.logInfo({
+                        action: DataAction.Use,
+                        id: requestInternal.id,
+                        url: requestInternal.request.url!,
+                        source: DataSource.HttpRequest,
+                        performanceInsight: this.setDataSize(
+                            this.getPerformanceInsight(requestInternal.id),
+                            response.result
+                        ),
+                        dataSignature: this.writeSignature(response.result),
+                        fetchType: requestInternal.fetchType,
+                        httpMethod: requestInternal.httpMethod
+                    });
+                    return response;
+                } catch(error){
+                    this.stopPerformanceInsight(requestInternal.id);
+                    // We do not log error because the function getPersistentStoreData is already covering the persistence error log
+                    throw error;
+                }
             } else {
                 // We have something from the persistent cache
-                const persistentStorageEntry = persistentStorageValue as CachedData<T>;
+                const persistentStorageEntry = persistentStorageValue;
                 if (requestInternal.memoryCache !== undefined) {
                     this.addInMemoryCache(requestInternal, persistentStorageEntry.payload);
                 }
@@ -964,11 +993,10 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         const id = requestInternal.id;
         const url = requestInternal.request.url!;
         try {
-           
             if (this.openIndexDb === undefined) {
                 return;
             }
-          
+
             const deleted = await this.openIndexDb.data.delete(id);
             this.logInfo({
                 id: id,
