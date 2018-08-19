@@ -498,21 +498,30 @@ describe("DataAccessSingleton", () => {
                 beforeEach(() => {
                     das.fetchAndSaveInCacheIfExpired = jest.fn().mockRejectedValue("failFetchAndSaveInCacheIfExpired");
                     das.stopPerformanceInsight = jest.fn();
+                    das.deletePerformanceInsight = jest.fn();
                 });
                 it("returns a failed promise", async () => {
                     expect.assertions(1);
-                    try{
+                    try {
                         await das.fetchFast(request);
-                    } catch(e){
+                    } catch (e) {
                         expect(e).toBeDefined();
                     }
                 });
                 it("has stop the performance collection", async () => {
                     expect.assertions(1);
-                    try{
+                    try {
                         await das.fetchFast(request);
-                    } catch(e){
+                    } catch (e) {
                         expect(das.stopPerformanceInsight).toHaveBeenCalledTimes(1);
+                    }
+                });
+                it("has deleted the performance collection", async () => {
+                    expect.assertions(1);
+                    try {
+                        await das.fetchFast(request);
+                    } catch (e) {
+                        expect(das.deletePerformanceInsight).toHaveBeenCalledTimes(1);
                     }
                 });
             });
@@ -620,15 +629,26 @@ describe("DataAccessSingleton", () => {
                     });
                     describe("when fetching web fail", () => {
                         beforeEach(() => {
-                            das.fetchAndSaveInCacheIfExpired = jest.fn().mockRejectedValue("fetchAndSaveInCacheIfExpiredFail");
+                            das.fetchAndSaveInCacheIfExpired = jest
+                                .fn()
+                                .mockRejectedValue("fetchAndSaveInCacheIfExpiredFail");
                             das.stopPerformanceInsight = jest.fn();
+                            das.deletePerformanceInsight = jest.fn();
                         });
                         it("stop collecting performance", async () => {
                             expect.assertions(1);
-                            try{
+                            try {
                                 await das.fetchFast(request);
-                            }catch(e){
+                            } catch (e) {
                                 expect(das.stopPerformanceInsight).toHaveBeenCalledTimes(1);
+                            }
+                        });
+                        it("has deleted the performance collection", async () => {
+                            expect.assertions(1);
+                            try {
+                                await das.fetchFast(request);
+                            } catch (e) {
+                                expect(das.deletePerformanceInsight).toHaveBeenCalledTimes(1);
                             }
                         });
                     });
@@ -637,13 +657,22 @@ describe("DataAccessSingleton", () => {
                     beforeEach(() => {
                         das.getPersistentStoreData = jest.fn().mockRejectedValue("getPersistentStoreDataFail");
                         das.stopPerformanceInsight = jest.fn();
+                        das.deletePerformanceInsight = jest.fn();
                     });
                     it("stop collecting performance", async () => {
                         expect.assertions(1);
-                        try{
+                        try {
                             await das.fetchFast(request);
-                        }catch(e){
+                        } catch (e) {
                             expect(das.stopPerformanceInsight).toHaveBeenCalledTimes(1);
+                        }
+                    });
+                    it("has deleted the performance collection", async () => {
+                        expect.assertions(1);
+                        try {
+                            await das.fetchFast(request);
+                        } catch (e) {
+                            expect(das.deletePerformanceInsight).toHaveBeenCalledTimes(1);
                         }
                     });
                 });
@@ -901,8 +930,7 @@ describe("DataAccessSingleton", () => {
             das.setConfiguration({ isCacheEnabled: true });
             das.setDefaultCache = jest.fn();
             das.fetchAndSaveInCacheIfExpired = jest.fn();
-            das.tryMemoryCacheFetching = jest.fn().mockRejectedValue("tryMemoryCacheFetchingFail");
-            das.tryPersistentStorageFetching = jest.fn().mockRejectedValue("tryPersistentStorageFetchingFail");
+            das.tryMemoryCacheFetching = jest.fn();
             das.fetchWithAjax = jest.fn().mockResolvedValue(ajaxResponse);
             das.saveCache = jest.fn().mockResolvedValue(cacheDataNotExpired);
         });
@@ -932,57 +960,126 @@ describe("DataAccessSingleton", () => {
                 expect(das.saveCache).toHaveBeenCalledTimes(1);
             });
         });
-        describe("when value is NOT in memory cache", () => {
+        describe("when tryMemoryCacheFetching fails", () => {
+            beforeEach(() => {
+                das.tryMemoryCacheFetching = jest.fn().mockRejectedValue("tryMemoryCacheFetchingFail");
+                das.stopPerformanceInsight = jest.fn();
+                das.deletePerformanceInsight = jest.fn();
+            });
+            it("returns a failed promise", async () => {
+                expect.assertions(1);
+                try {
+                    await das.fetchFresh(request);
+                } catch (e) {
+                    expect(e).toBeDefined();
+                }
+            });
+            it("has stop the performance collection", async () => {
+                expect.assertions(1);
+                try {
+                    await das.fetchFresh(request);
+                } catch (e) {
+                    expect(das.stopPerformanceInsight).toHaveBeenCalledTimes(1);
+                }
+            });
+            it("has deleted the performance collection", async () => {
+                expect.assertions(1);
+                try {
+                    await das.fetchFresh(request);
+                } catch (e) {
+                    expect(das.deletePerformanceInsight).toHaveBeenCalledTimes(1);
+                }
+            });
+        });
+        describe("when tryMemoryCacheFetching successful", () => {
             beforeEach(() => {
                 das.tryMemoryCacheFetching = jest.fn().mockResolvedValue(undefined);
-                das.tryPersistentStorageFetching = jest.fn().mockResolvedValue(undefined);
             });
-            it("returns call persistent storage", async () => {
-                await das.fetchFresh(request);
-                expect(das.tryPersistentStorageFetching).toHaveBeenCalledTimes(1);
-            });
-            describe("when value is NOT in persistent cache", () => {
-                beforeEach(() => {
-                    das.tryPersistentStorageFetching = jest.fn().mockResolvedValue(undefined);
-                });
-                it("calls Ajax HTTP request", async () => {
-                    await das.fetchFresh(request);
-                    expect(das.fetchWithAjax).toHaveBeenCalledTimes(1);
-                });
-
-                describe("when Ajax fail", () => {
+            describe("when tryPersistentStorageFetching successful", () => {
+                describe("when value is NOT in memory cache", () => {
                     beforeEach(() => {
-                        das.fetchWithAjax = jest.fn().mockRejectedValue("error");
+                        das.tryMemoryCacheFetching = jest.fn().mockResolvedValue(undefined);
+                        das.tryPersistentStorageFetching = jest.fn().mockResolvedValue(undefined);
                     });
-                    it("throws an error", async () => {
-                        expect.assertions(1);
-                        try {
+                    it("returns call persistent storage", async () => {
+                        await das.fetchFresh(request);
+                        expect(das.tryPersistentStorageFetching).toHaveBeenCalledTimes(1);
+                    });
+                    describe("when value is NOT in persistent cache", () => {
+                        beforeEach(() => {
+                            das.tryPersistentStorageFetching = jest.fn().mockResolvedValue(undefined);
+                        });
+                        it("calls Ajax HTTP request", async () => {
                             await das.fetchFresh(request);
-                        } catch (e) {
-                            expect(e).toEqual("error");
-                        }
+                            expect(das.fetchWithAjax).toHaveBeenCalledTimes(1);
+                        });
+
+                        describe("when Ajax fail", () => {
+                            beforeEach(() => {
+                                das.fetchWithAjax = jest.fn().mockRejectedValue("error");
+                            });
+                            it("throws an error", async () => {
+                                expect.assertions(1);
+                                try {
+                                    await das.fetchFresh(request);
+                                } catch (e) {
+                                    expect(e).toEqual("error");
+                                }
+                            });
+                        });
+                    });
+                    describe("when value is in persistent cache", () => {
+                        beforeEach(() => {
+                            das.tryPersistentStorageFetching = jest.fn().mockResolvedValue(dataResponseFromCache);
+                        });
+                        it("calls save cache", async () => {
+                            await das.fetchFresh(request);
+                            expect(das.saveCache).toHaveBeenCalledTimes(1);
+                        });
+                    });
+                    describe("when tryPersistentStorageFetching fail", () => {
+                        beforeEach(() => {
+                            das.tryPersistentStorageFetching = jest.fn().mockRejectedValue("Error");
+                            das.deletePerformanceInsight = jest.fn();
+                        });
+                        it("deletes performance insight", async () => {
+                            try {
+                                await das.fetchFresh(request);
+                            } catch {}
+                            expect(das.deletePerformanceInsight).toHaveBeenCalledTimes(1);
+                        });
                     });
                 });
             });
-            describe("when value is in persistent cache", () => {
+            describe("when tryPersistentStorageFetching fails patrick", () => {
                 beforeEach(() => {
-                    das.tryPersistentStorageFetching = jest.fn().mockResolvedValue(dataResponseFromCache);
-                });
-                it("calls save cache", async () => {
-                    await das.fetchFresh(request);
-                    expect(das.saveCache).toHaveBeenCalledTimes(1);
-                });
-            });
-            describe("when tryPersistentStorageFetching fail", () => {
-                beforeEach(() => {
-                    das.tryPersistentStorageFetching = jest.fn().mockRejectedValue("Error");
+                    das.tryPersistentStorageFetching = jest.fn().mockRejectedValue("tryPersistentStorageFetchingFail");
+                    das.stopPerformanceInsight = jest.fn();
                     das.deletePerformanceInsight = jest.fn();
                 });
-                it("deletes performance insight", async () => {
+                it("returns a failed promise", async () => {
+                    expect.assertions(1);
                     try {
                         await das.fetchFresh(request);
-                    } catch {}
-                    expect(das.deletePerformanceInsight).toHaveBeenCalledTimes(1);
+                    } catch (e) {
+                        expect(e).toBeDefined();
+                    }
+                });
+                it("has stop the performance collection", async () => {
+                    expect.assertions(1);
+                    try {
+                        await das.fetchFresh(request);
+                    } catch (e) {
+                        expect(das.stopPerformanceInsight).toHaveBeenCalledTimes(2); // One for memory and one in the catch
+                    }
+                });
+                it("has deleted the performance collection", async () => {
+                    expect.assertions(1);
+                    try {
+                        await das.fetchFresh(request);
+                    } catch (e) {
+                        expect(das.deletePerformanceInsight).toHaveBeenCalledTimes(1);
+                    }
                 });
             });
         });

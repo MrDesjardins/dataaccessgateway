@@ -229,7 +229,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 });
             }
         } catch (reason) {
-            this.deletePerformanceInsight(requestInternal.id);
+            this.stopPerformanceInsight(requestInternal.id);             
             this.logError({
                 id: requestInternal.id,
                 url: requestInternal.request.url!,
@@ -240,6 +240,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 fetchType: requestInternal.fetchType,
                 httpMethod: requestInternal.httpMethod
             });
+            this.deletePerformanceInsight(requestInternal.id);
             throw reason;
         }
 
@@ -271,7 +272,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 });
             }
         } catch (reason) {
-            this.deletePerformanceInsight(requestInternal.id);
+            this.stopPerformanceInsight(requestInternal.id); 
             this.logError({
                 id: requestInternal.id,
                 url: requestInternal.request.url!,
@@ -282,6 +283,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 fetchType: requestInternal.fetchType,
                 httpMethod: requestInternal.httpMethod
             });
+            this.deletePerformanceInsight(requestInternal.id);
             throw reason;
         }
 
@@ -306,7 +308,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 result: value.data
             });
         } catch (reason) {
-            // this.deletePerformanceInsight(requestInternal.id);
+            this.stopPerformanceInsight(requestInternal.id);
             this.logError({
                 id: requestInternal.id,
                 url: requestInternal.request.url!,
@@ -317,6 +319,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 fetchType: requestInternal.fetchType,
                 httpMethod: requestInternal.httpMethod
             });
+            this.deletePerformanceInsight(requestInternal.id);
             throw reason;
         }
     }
@@ -354,6 +357,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                     fetchType: requestInternal.fetchType,
                     httpMethod: requestInternal.httpMethod
                 });
+                this.deletePerformanceInsight(requestInternal.id);
                 return response;
             } catch (error) {
                 this.stopPerformanceInsight(requestInternal.id);
@@ -367,6 +371,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                     fetchType: requestInternal.fetchType,
                     httpMethod: requestInternal.httpMethod
                 });
+                this.deletePerformanceInsight(requestInternal.id);
                 throw error;
             }
         }
@@ -382,6 +387,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 );
             } catch (error) {
                 this.stopPerformanceInsight(requestInternal.id);
+                this.deletePerformanceInsight(requestInternal.id);
                 // We do not log error because the function getPersistentStoreData is already covering the persistence error log
                 throw error;
             }
@@ -406,9 +412,11 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                         fetchType: requestInternal.fetchType,
                         httpMethod: requestInternal.httpMethod
                     });
+                    this.deletePerformanceInsight(requestInternal.id);
                     return response;
                 } catch(error){
                     this.stopPerformanceInsight(requestInternal.id);
+                    this.deletePerformanceInsight(requestInternal.id);
                     // We do not log error because the function getPersistentStoreData is already covering the persistence error log
                     throw error;
                 }
@@ -438,6 +446,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                     fetchType: requestInternal.fetchType,
                     httpMethod: requestInternal.httpMethod
                 });
+                this.deletePerformanceInsight(requestInternal.id);
                 return Promise.resolve({
                     source: DataSource.PersistentStorageCache,
                     result: persistentStorageEntry.payload
@@ -460,6 +469,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 fetchType: requestInternal.fetchType,
                 httpMethod: requestInternal.httpMethod
             });
+            this.deletePerformanceInsight(requestInternal.id);
             return Promise.resolve({
                 source: DataSource.MemoryCache,
                 result: memoryCacheEntry.payload
