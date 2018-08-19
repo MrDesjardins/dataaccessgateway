@@ -452,7 +452,7 @@ describe("DataAccessSingleton", () => {
     });
 
     describe("fetchFast", () => {
-        beforeEach(()=>{
+        beforeEach(() => {
             das.addInPersistentStore = jest.fn().mockRejectedValue("addInPersistentStoreFail");
             das.getPersistentStoreData = jest.fn().mockRejectedValue("getPersistentStoreDataFail");
             das.deleteFromPersistentStorage = jest.fn().mockRejectedValue("deleteFromPersistentStorageFail");
@@ -1622,38 +1622,127 @@ describe("DataAccessSingleton", () => {
             });
         });
     });
-    // describe("addInPersistentStore", () => {
-    //     describe("when transaction is successful", () => {
-    //         beforeEach(() => {
-    //             das.openIndexDb.transaction = jest.fn().mockResolvedValue("ok");
-    //             das.openIndexDb.data.put= jest.fn().mockResolvedValue("ok");
-    //         });
-    //         it("removes from on-going list", async () => {
-    //             const result = await das.addInPersistentStore("id", cacheDataExpired);
-    //             expect(result).toEqual("ok");
-    //         });
-    //     });
-    //     describe("when transaction fails", () => {
-    //         beforeEach(() => {
-    //             das.openIndexDb.transaction = jest.fn().mockRejectedValue("error");
-    //         });
-    //         it("removes from on-going list", async () => {
-    //             try {
-    //                 await das.addInPersistentStore("id", cacheDataExpired);
-    //             } catch (e) {
-    //                 expect(e).toBeDefined();
-    //             }
-    //         });
-    //         it("calls the logerror", async () => {
-    //             await das.addInPersistentStore("id", cacheDataExpired);
-    //             expect(das.options.logError).toHaveBeenCalledTimes(1);
-    //         });
-    //     });
-    // });
+    describe("addInPersistentStore", () => {
+        describe("when transaction is successful", () => {
+            beforeEach(() => {
+                das.openIndexDb = new DataAccessIndexDbDatabase("testDB");
+                (das.openIndexDb.transaction as any) = (
+                    mode: string,
+                    tables: Dexie.Table<any, any>,
+                    scope: () => Promise<any>
+                ) => {
+                    scope();
+                };
+            });
+            describe("when saving the data (put) in indexd successful", () => {
+                beforeEach(() => {
+                    das.openIndexDb.data.put = jest.fn().mockResolvedValue("ok");
+                });
+                it("returns void", async () => {
+                    const result = await das.addInPersistentStore(
+                        getMockAjaxRequestInternal("ID123"),
+                        cacheDataExpired
+                    );
+                    expect(result).toBeUndefined();
+                });
+            });
+            describe("when saving the data (put) in indexd fails", () => {
+                beforeEach(() => {
+                    das.openIndexDb.data.put = jest.fn().mockRejectedValue("error");
+                    das.logError = jest.fn();
+                });
+                it("throws an exception ", async () => {
+                    try {
+                        await das.addInPersistentStore(getMockAjaxRequestInternal("ID123"), cacheDataExpired);
+                    } catch (e) {
+                        expect(e).toBeDefined();
+                    }
+                });
+                it("calls the logerror", async () => {
+                    (das.openIndexDb.transaction as any) = (
+                        mode: string,
+                        tables: Dexie.Table<any, any>,
+                        scope: () => Promise<any>
+                    ) => {
+                        scope();
+                    };
+                    das.openIndexDb.data.put = jest.fn().mockRejectedValue("error");
+                    try {
+                        await das.addInPersistentStore(getMockAjaxRequestInternal("1"), cacheDataExpired);
+                    } catch (e) {}
+                    expect(das.logError).toHaveBeenCalledTimes(1);
+                });
+            });
+        });
+        describe("when transaction fails", () => {
+            beforeEach(() => {
+                das.openIndexDb.transaction = jest.fn().mockRejectedValue("error");
+            });
+            it("throws an exception ", async () => {
+                try {
+                    await das.addInPersistentStore(getMockAjaxRequestInternal("ID123"), cacheDataExpired);
+                } catch (e) {
+                    expect(e).toBeDefined();
+                }
+            });
+            it("calls the logerror", async () => {
+                await das.addInPersistentStore(getMockAjaxRequestInternal("ID123"), cacheDataExpired);
+                expect(das.options.logError).toHaveBeenCalledTimes(1);
+            });
+        });
+    });
 
-    // describe("getPersistentStoreData", () => {
-
-    // });
+    describe("getPersistentStoreData", () => {
+        describe("indexdb not instantiated", () => {
+            beforeEach(() => {
+                das.openIndexDb = undefined;
+            });
+            it("returns a void promise", async () => {
+                expect.assertions(1);
+                try {
+                    das.openIndexDb = undefined;
+                    await das.getPersistentStoreData(getMockAjaxRequestInternal(""));
+                    expect(true).toBeTruthy();
+                } catch (e) {
+                    expect(e).toBeUndefined();
+                }
+            });
+        });
+        describe("indexdb defined", () => {
+            beforeEach(() => {
+                das.openIndexDb = new DataAccessIndexDbDatabase("testDB");
+                das.openIndexDb.data.get = jest.fn().mockResolvedValue("data_value_1");
+            });
+            it("get data from the indexdb", async () => {
+                await das.getPersistentStoreData(getMockAjaxRequestInternal("1"));
+                expect(das.openIndexDb.data.get).toHaveBeenCalledTimes(1);
+            });
+            it("returns the data from the indexdb", async () => {
+                const result = await das.getPersistentStoreData(getMockAjaxRequestInternal("1"));
+                expect(result).toEqual("data_value_1");
+            });
+            describe("it fails getting from the indexdb", () => {
+                beforeEach(() => {
+                    das.openIndexDb = new DataAccessIndexDbDatabase("testDB");
+                    das.openIndexDb.data.get = jest.fn().mockRejectedValue("");
+                    das.logError = jest.fn();
+                });
+                it("calls logerrors", async () => {
+                    try {
+                        await das.getPersistentStoreData(getMockAjaxRequestInternal("1"));
+                    } catch (e) {}
+                    expect(das.logError).toHaveBeenCalledTimes(1);
+                });
+                it("returns undefined", async () => {
+                    expect.assertions(1);
+                    try {
+                        const result = await das.getPersistentStoreData(getMockAjaxRequestInternal("1"));
+                        expect(result).toBeUndefined();
+                    } catch (e) {}
+                });
+            });
+        });
+    });
 
     describe("deletePersistentStorage", () => {
         describe("when successful", () => {
@@ -1724,8 +1813,7 @@ describe("DataAccessSingleton", () => {
                 it("calls logerrors", async () => {
                     try {
                         await das.deleteFromPersistentStorage(getMockAjaxRequestInternal("1"));
-                    } catch (e) {
-                    }
+                    } catch (e) {}
                     expect(das.logError).toHaveBeenCalledTimes(1);
                 });
                 it("throws", async () => {

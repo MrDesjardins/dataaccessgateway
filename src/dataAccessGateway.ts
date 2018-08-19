@@ -885,6 +885,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                         fetchType: requestInternal.fetchType,
                         httpMethod: requestInternal.httpMethod
                     });
+                    throw e;
                 });
         } catch (reason) {
             this.logError({
