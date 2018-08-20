@@ -653,29 +653,6 @@ describe("DataAccessSingleton", () => {
                         });
                     });
                 });
-                describe("when fetching persistence cache fail", () => {
-                    beforeEach(() => {
-                        das.getPersistentStoreData = jest.fn().mockRejectedValue("getPersistentStoreDataFail");
-                        das.stopPerformanceInsight = jest.fn();
-                        das.deletePerformanceInsight = jest.fn();
-                    });
-                    it("stop collecting performance", async () => {
-                        expect.assertions(1);
-                        try {
-                            await das.fetchFast(request);
-                        } catch (e) {
-                            expect(das.stopPerformanceInsight).toHaveBeenCalledTimes(1);
-                        }
-                    });
-                    it("has deleted the performance collection", async () => {
-                        expect.assertions(1);
-                        try {
-                            await das.fetchFast(request);
-                        } catch (e) {
-                            expect(das.deletePerformanceInsight).toHaveBeenCalledTimes(1);
-                        }
-                    });
-                });
             });
 
             describe("when HTTP status 500 followed by a second same call", () => {

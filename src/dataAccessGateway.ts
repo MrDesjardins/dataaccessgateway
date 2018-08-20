@@ -387,7 +387,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 this.stopPerformanceInsight(requestInternal.id);
                 this.deletePerformanceInsight(requestInternal.id);
                 // We do not log error because the function getPersistentStoreData is already covering the persistence error log
-                throw error;
+                // We do not throw, the value will be undefined and Ajax will kick in
             }
             if (persistentStorageValue === undefined) {
                 // Not in the persistent storage means we must fetch from API
