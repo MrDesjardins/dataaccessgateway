@@ -229,7 +229,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 });
             }
         } catch (reason) {
-            this.stopPerformanceInsight(requestInternal.id);             
+            this.stopPerformanceInsight(requestInternal.id);
             this.logError({
                 id: requestInternal.id,
                 url: requestInternal.request.url!,
@@ -272,7 +272,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 });
             }
         } catch (reason) {
-            this.stopPerformanceInsight(requestInternal.id); 
+            this.stopPerformanceInsight(requestInternal.id);
             this.logError({
                 id: requestInternal.id,
                 url: requestInternal.request.url!,
@@ -382,9 +382,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             let persistentStorageValue: CachedData<T> | undefined = undefined;
             // Not in memory, check in long term storage
             try {
-                persistentStorageValue = await this.getPersistentStoreData<T>(
-                    requestInternal
-                );
+                persistentStorageValue = await this.getPersistentStoreData<T>(requestInternal);
             } catch (error) {
                 this.stopPerformanceInsight(requestInternal.id);
                 this.deletePerformanceInsight(requestInternal.id);
@@ -393,7 +391,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             }
             if (persistentStorageValue === undefined) {
                 // Not in the persistent storage means we must fetch from API
-                try{
+                try {
                     const response: DataResponse<T> = await this.fetchAndSaveInCacheIfExpired<T>(
                         requestInternal,
                         DataSource.HttpRequest
@@ -414,7 +412,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                     });
                     this.deletePerformanceInsight(requestInternal.id);
                     return response;
-                } catch(error){
+                } catch (error) {
                     this.stopPerformanceInsight(requestInternal.id);
                     this.deletePerformanceInsight(requestInternal.id);
                     // We do not log error because the function getPersistentStoreData is already covering the persistence error log
@@ -1146,12 +1144,16 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         } else {
             str = JSON.stringify(toHash);
         }
-        let res = 0;
-        let len = str.length;
-        for (var i = 0; i < len; i++) {
-            res = res * 31 + str.charCodeAt(i);
+        var hash = 0;
+        if (str.length == 0) {
+            return str;
         }
-        return res.toString();
+        for (let i = 0; i < str.length; i++) {
+            let char = str.charCodeAt(i);
+            hash = (hash << 5) - hash + char;
+            hash = hash & hash; // Convert to 32bit integer
+        }
+        return hash.toString();
     }
 }
 const DataAccessGateway: (databaseName: string) => IDataAccessSingleton = (databaseName: string = "DatabaseName") =>

@@ -1980,4 +1980,31 @@ describe("DataAccessSingleton", () => {
             });
         });
     });
+    describe("hashCode", () => {
+        describe("compare two differenst request internal", () => {
+            let obj1: string;
+            let obj2: string;
+            beforeEach(() => {
+                obj1 = JSON.stringify({
+                    id: undefined,
+                    params: undefined,
+                    method: "GET",
+                    url: "http://longurl.withsubdomain.domain.com/api/read/version1/entityA/123/entityB/1",
+                    baseURL: "",
+                    data: {}
+                });
+                obj2 = JSON.stringify({
+                    id: undefined,
+                    params: undefined,
+                    method: "GET",
+                    url: "http://longurl.withsubdomain.domain.com/api/read/version1/entityA/121/entityB/1",
+                    baseURL: "",
+                    data: {}
+                });
+            });
+            it("returns different hash", () => {
+                expect(das.hashCode(obj1)).not.toEqual(das.hashCode(obj2));
+            });
+        });
+    });
 });
