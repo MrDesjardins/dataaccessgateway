@@ -18,7 +18,6 @@ module.exports = {
             root: __dirname
         })
     ],
-    devtool: "source-map",
     resolve: {
         extensions: [".ts", ".js", ".json"]
     },
