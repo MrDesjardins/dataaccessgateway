@@ -1,4 +1,4 @@
-import axios, { AxiosPromise, AxiosRequestConfig, AxiosResponse } from "axios";
+import axios, { AxiosError, AxiosPromise, AxiosRequestConfig, AxiosResponse } from "axios";
 import Dexie from "dexie";
 import { AjaxRequest, AjaxRequestExecute, AjaxRequestInternal, AjaxRequestWithCache, CacheDataWithId, CachedData, DataAction, DataResponse, DataSource, FetchType, HttpMethod, LogError, LogInfo, OnGoingAjaxRequest, PerformanceRequestInsight } from "./model";
 export class DataAccessIndexDbDatabase extends Dexie {
@@ -25,6 +25,7 @@ export interface DataAccessSingletonOptions {
     logError: (error: LogError) => void;
     logInfo: (info: LogInfo) => void;
     alterObjectBeforeHashing?: <T>(obj: T) => any;
+    onBackgroundAjaxFetchFailure: (response: AxiosResponse | AxiosError) => void;
 }
 
 /**
@@ -66,7 +67,10 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         logInfo: () => {
             /*Nothing*/
         },
-        alterObjectBeforeHashing: undefined
+        alterObjectBeforeHashing: undefined,
+        onBackgroundAjaxFetchFailure: () => {
+            /*Nothing*/
+        }
     };
     public options: DataAccessSingletonOptions = this.DefaultOptions;
     public onGoingAjaxRequest: Map<string, OnGoingAjaxRequest> = new Map<string, OnGoingAjaxRequest>();
@@ -424,11 +428,16 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 if (requestInternal.memoryCache !== undefined) {
                     this.addInMemoryCache(requestInternal, persistentStorageEntry.payload);
                 }
-                this.fetchAndSaveInCacheIfExpired<T>(
-                    requestInternal,
-                    DataSource.PersistentStorageCache,
-                    persistentStorageEntry
-                ); // It's expired which mean we fetch to get fresh data HOWEVER, we will return the obsolete data to have a fast response
+                // It's expired which mean we fetch to get fresh data HOWEVER, we will return the obsolete data to have a fast response
+                try {
+                    this.fetchAndSaveInCacheIfExpired<T>(
+                        requestInternal,
+                        DataSource.PersistentStorageCache,
+                        persistentStorageEntry
+                    );
+                } catch (e) {
+                    /* We have handle it enought for this case of background call */
+                }
                 // Return the persistent storage even if expired
                 this.stopPerformanceInsight(requestInternal.id);
                 this.logInfo({
@@ -451,7 +460,11 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 });
             }
         } else {
-            this.fetchAndSaveInCacheIfExpired<T>(requestInternal, DataSource.MemoryCache, memoryCacheEntry); // We have something in the memory, but we might still want to fetch if expire for future requests
+            try {
+                this.fetchAndSaveInCacheIfExpired<T>(requestInternal, DataSource.MemoryCache, memoryCacheEntry); // We have something in the memory, but we might still want to fetch if expire for future requests
+            } catch (e) {
+                /* We have handle it enought for this case of background call */
+            }
             this.stopPerformanceInsight(requestInternal.id, DataSource.MemoryCache);
             this.stopPerformanceInsight(requestInternal.id);
             this.logInfo({
@@ -480,6 +493,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         source: DataSource,
         cacheEntry?: CachedData<T> | undefined
     ): Promise<DataResponse<T>> {
+        const ERROR_HANDLED_MSG = "Cannot cache request that are not in the range of 200 or in the range of 300.";
         if (cacheEntry === undefined || new Date().getTime() > new Date(cacheEntry.expirationDateTime).getTime()) {
             try {
                 this.startPerformanceInsight(requestInternal.id, DataSource.HttpRequest);
@@ -501,7 +515,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                         result: value.data
                     });
                 } else {
-                    throw Error("Cannot cache request that are not in the range of 200 or in the range of 300.");
+                    this.options.onBackgroundAjaxFetchFailure(value);
+                    throw Error(ERROR_HANDLED_MSG);
                 }
             } catch (error) {
                 this.stopPerformanceInsight(this.getPerformanceInsight(requestInternal.id), DataSource.HttpRequest);
@@ -515,6 +530,9 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                     fetchType: requestInternal.fetchType,
                     httpMethod: requestInternal.httpMethod
                 });
+                if (error.message !== ERROR_HANDLED_MSG) { // To improve. At the moment, trick to avoid double sending
+                    this.options.onBackgroundAjaxFetchFailure(error);
+                }
                 throw error;
             }
         } else {

@@ -740,6 +740,7 @@ describe("DataAccessSingleton", () => {
             describe("when status code is 500", () => {
                 beforeEach(() => {
                     ajaxResponse.status = 500;
+                    das.options.onBackgroundAjaxFetchFailure = jest.fn();
                 });
                 it("does not save in cache", async () => {
                     try {
@@ -748,6 +749,14 @@ describe("DataAccessSingleton", () => {
                         expect(e).toBeDefined();
                     }
                     expect(das.saveCache).toHaveBeenCalledTimes(0);
+                });
+                it("calls background failure option", async () => {
+                    try {
+                        await das.fetchAndSaveInCacheIfExpired(requestWithId, source, cacheEntry);
+                    } catch (e) {
+                        expect(e).toBeDefined();
+                    }
+                    expect(das.options.onBackgroundAjaxFetchFailure).toHaveBeenCalledTimes(1);
                 });
             });
         });
