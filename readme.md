@@ -272,12 +272,25 @@ Most scenario will throw an error that can be caught by the promise. However, so
 DataAccessGateway("AppName").setConfiguration({ log: (reason: any) => { Log.trackError(reason); } });
 ``` 
 
-# Turning off the cache
+# Turning off the cache in general (for all requests)
 
 It can be handy to turn off the caching capability and have a fall-through to always perform the Ajax request.
 ``` 
 DataAccessGateway("AppName").setConfiguration({ isCacheEnabled: true });
 ``` 
+
+# Turning off the cache for a specific request
+
+You may have set to have the cache enabled but for some requests wish to not use a specic kind of cache. A scenario could be that you need to cache an object which is not supported by the memory cache (because of the serialization). In that case, you may want to skip for these particular cases the memory cache and still be able to rely on the persistent cache (taht support object). The setting is on the request. Instead of setting a memory configuration, you can set `null`. It is important to notice that `undefined` would set the setting with the default general cache and `null` specify to not fallback to the default cache setting. `null` is the value you want to use in that particular case.
+
+``` 
+// Example that will only rely on the persistent cache
+const promiseResult = DataAccessGateway("AppName").fetchFast<YourEntityResponse>({
+                            memoryCache: null,
+                            persistentCache: { lifespanInSeconds: 60 * 60 * 24 },
+                            request: request
+                        });
+```
 
 # Default cache time
 
