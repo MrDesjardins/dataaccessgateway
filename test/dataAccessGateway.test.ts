@@ -327,7 +327,7 @@ describe("DataAccessSingleton", () => {
     });
 
     describe("setDefaultCache", () => {
-        describe("when NO memory cache defined", () => {
+        describe("when memory cache is undefined", () => {
             beforeEach(() => {
                 requestWithId.memoryCache = undefined;
             });
@@ -349,22 +349,45 @@ describe("DataAccessSingleton", () => {
                     expect(requestWithId.memoryCache).toBeUndefined();
                 });
             });
-            describe("when memory cache defined", () => {
-                let memoryCache: CacheConfiguration;
+        });
+        describe("when memory cache is null", () => {
+            beforeEach(() => {
+                requestWithId.memoryCache = null;
+            });
+            describe("when cache mandatory", () => {
                 beforeEach(() => {
-                    memoryCache = { lifespanInSeconds: 9876 };
-                    requestWithId.memoryCache = memoryCache;
+                    das.options.isCacheMandatoryIfEnabled = true;
+                });
+                it("does NOT the default cache", () => {
+                    das.setDefaultCache(requestWithId);
+                    expect(requestWithId.memoryCache).toBeNull();
+                });
+            });
+            describe("when cache NOT mandatory", () => {
+                beforeEach(() => {
+                    das.options.isCacheMandatoryIfEnabled = false;
                 });
                 it("does NOT sets the default cache", () => {
                     das.setDefaultCache(requestWithId);
-                    expect(requestWithId.memoryCache).toBe(memoryCache);
+                    expect(requestWithId.memoryCache).toBeNull();
                 });
+            });
+        });
+        describe("when memory cache is defined", () => {
+            let memoryCache: CacheConfiguration;
+            beforeEach(() => {
+                memoryCache = { lifespanInSeconds: 9876 };
+                requestWithId.memoryCache = memoryCache;
+            });
+            it("does NOT sets the default cache", () => {
+                das.setDefaultCache(requestWithId);
+                expect(requestWithId.memoryCache).toBe(memoryCache);
             });
         });
     });
 
     describe("setDefaultFastCache", () => {
-        describe("when NO persistent cache defined", () => {
+        describe("when persistent cache is undefined", () => {
             beforeEach(() => {
                 requestWithId.persistentCache = undefined;
             });
@@ -386,16 +409,39 @@ describe("DataAccessSingleton", () => {
                     expect(requestWithId.persistentCache).toBeUndefined();
                 });
             });
-            describe("when persistent cache defined", () => {
-                let fastCache: CacheConfiguration;
+        });
+        describe("when persistent cache is null", () => {
+            beforeEach(() => {
+                requestWithId.persistentCache = null;
+            });
+            describe("when cache mandatory", () => {
                 beforeEach(() => {
-                    fastCache = { lifespanInSeconds: 9876 };
-                    requestWithId.persistentCache = fastCache;
+                    das.options.isCacheMandatoryIfEnabled = true;
+                });
+                it("sets the default cache", () => {
+                    das.setDefaultFastCache(requestWithId);
+                    expect(requestWithId.persistentCache).toBeNull();
+                });
+            });
+            describe("when cache NOT mandatory", () => {
+                beforeEach(() => {
+                    das.options.isCacheMandatoryIfEnabled = false;
                 });
                 it("does NOT sets the default cache", () => {
                     das.setDefaultFastCache(requestWithId);
-                    expect(requestWithId.persistentCache).toBe(fastCache);
+                    expect(requestWithId.persistentCache).toBeNull();
                 });
+            });
+        });
+        describe("when persistent cache is defined", () => {
+            let fastCache: CacheConfiguration;
+            beforeEach(() => {
+                fastCache = { lifespanInSeconds: 9876 };
+                requestWithId.persistentCache = fastCache;
+            });
+            it("does NOT sets the default cache", () => {
+                das.setDefaultFastCache(requestWithId);
+                expect(requestWithId.persistentCache).toBe(fastCache);
             });
         });
     });
@@ -462,7 +508,9 @@ describe("DataAccessSingleton", () => {
             request = {
                 request: {
                     url: "http://request"
-                }
+                },
+                memoryCache: { lifespanInSeconds: 1 },
+                persistentCache: { lifespanInSeconds: 1 }
             };
         });
         describe("when cache disabled", () => {
@@ -529,7 +577,7 @@ describe("DataAccessSingleton", () => {
         describe("when cache enabled", () => {
             beforeEach(() => {
                 das.setConfiguration({ isCacheEnabled: true });
-                das.setDefaultFastCache = jest.fn();
+                das.setDefaultFastCache = jest.fn().mockRejectedValue(request);
                 das.fetchAndSaveInCacheIfExpired = jest.fn().mockResolvedValue(dataResponseFromCache);
             });
             it("always set default request id", () => {
@@ -553,11 +601,7 @@ describe("DataAccessSingleton", () => {
                 });
                 describe("when data in memory cache has expired", () => {
                     beforeEach(() => {
-                        das.getMemoryStoreData = jest.fn().mockReturnValue(cacheDataExpired);
-                    });
-                    it("returns the data found in cache", () => {
-                        das.fetchFast(request);
-                        expect(das.getMemoryStoreData).toHaveBeenCalledTimes(1);
+                        das.tryMemoryCacheFetching = jest.fn().mockReturnValue(cacheDataExpired);
                     });
                     it("invokes fetch", () => {
                         das.fetchFast(request);
@@ -616,6 +660,24 @@ describe("DataAccessSingleton", () => {
                         it("adds in memory", async () => {
                             await das.fetchFast(request);
                             expect(das.addInMemoryCache).toHaveBeenCalledTimes(1);
+                        });
+                    });
+                    describe("when memory cache is null", () => {
+                        beforeEach(() => {
+                            request.memoryCache = null;
+                        });
+                        it("adds NOT in memory", async () => {
+                            await das.fetchFast(request);
+                            expect(das.addInMemoryCache).toHaveBeenCalledTimes(0);
+                        });
+                    });
+                    describe("when memory cache is undefined", () => {
+                        beforeEach(() => {
+                            request.memoryCache = undefined;
+                        });
+                        it("adds NOT in memory", async () => {
+                            await das.fetchFast(request);
+                            expect(das.addInMemoryCache).toHaveBeenCalledTimes(0);
                         });
                     });
                 });
@@ -820,6 +882,7 @@ describe("DataAccessSingleton", () => {
                 result: "Test",
                 source: DataSource.HttpRequest
             };
+            das.options.isCacheMandatoryIfEnabled = true;
             das.addInMemoryCache = jest.fn();
             das.addInPersistentStore = jest.fn().mockResolvedValue("test");
         });
@@ -863,6 +926,26 @@ describe("DataAccessSingleton", () => {
                 expect(das.addInPersistentStore).toHaveBeenCalledTimes(1);
             });
         });
+
+        describe("when memory cache is null", () => {
+            beforeEach(() => {
+                requestWithId.memoryCache = null;
+            });
+            it("does NOT add in memory", async () => {
+                await das.saveCache(requestWithId, response);
+                expect(das.addInMemoryCache).toHaveBeenCalledTimes(0);
+            });
+        });
+        describe("when memory cache is null", () => {
+            beforeEach(() => {
+                requestWithId.persistentCache = null;
+            });
+            it("does NOT add in persistent storage", async () => {
+                await das.saveCache(requestWithId, response);
+                expect(das.addInPersistentStore).toHaveBeenCalledTimes(0);
+            });
+        });
+
         it("returns the response from the parameter", async () => {
             const result = await das.saveCache(requestWithId, response);
             expect(result).toBe(response);
@@ -946,37 +1029,6 @@ describe("DataAccessSingleton", () => {
                 expect(das.saveCache).toHaveBeenCalledTimes(1);
             });
         });
-        describe("when tryMemoryCacheFetching fails", () => {
-            beforeEach(() => {
-                das.tryMemoryCacheFetching = jest.fn().mockRejectedValue("tryMemoryCacheFetchingFail");
-                das.stopPerformanceInsight = jest.fn();
-                das.deletePerformanceInsight = jest.fn();
-            });
-            it("returns a failed promise", async () => {
-                expect.assertions(1);
-                try {
-                    await das.fetchFresh(request);
-                } catch (e) {
-                    expect(e).toBeDefined();
-                }
-            });
-            it("has stop the performance collection", async () => {
-                expect.assertions(1);
-                try {
-                    await das.fetchFresh(request);
-                } catch (e) {
-                    expect(das.stopPerformanceInsight).toHaveBeenCalledTimes(1);
-                }
-            });
-            it("has deleted the performance collection", async () => {
-                expect.assertions(1);
-                try {
-                    await das.fetchFresh(request);
-                } catch (e) {
-                    expect(das.deletePerformanceInsight).toHaveBeenCalledTimes(1);
-                }
-            });
-        });
         describe("when tryMemoryCacheFetching successful", () => {
             beforeEach(() => {
                 das.tryMemoryCacheFetching = jest.fn().mockResolvedValue(undefined);
@@ -1036,8 +1088,44 @@ describe("DataAccessSingleton", () => {
                         });
                     });
                 });
+
+                describe("when value in memory cache", () => {
+                    describe("when value is not expired", () => {
+                        let contentOfSaveCache: DataResponse<string>;
+                        beforeEach(() => {
+                            contentOfSaveCache = { result: cacheDataNotExpired.payload, source: DataSource.MemoryCache };
+                            das.saveCache = jest.fn().mockReturnValue(contentOfSaveCache);
+                            das.tryMemoryCacheFetching = jest.fn().mockReturnValue(cacheDataNotExpired);
+                            das.tryPersistentStorageFetching = jest.fn();
+                        });
+                        it("calls save cache", async () => {
+                            await das.fetchFresh(request);
+                            expect(das.saveCache).toHaveBeenCalledTimes(1);
+                        });
+                        it("returns the content of saveCache", async () => {
+                            const result = await das.fetchFresh(request);
+                            expect(result).toBe(contentOfSaveCache);
+                        });
+                        it("does NOT call the persistent storage", async () => {
+                            await das.fetchFresh(request);
+                            expect(das.tryPersistentStorageFetching).toHaveBeenCalledTimes(0);
+                        });
+                    });
+                    describe("when value is expired", () => {
+                        let contentOfSaveCache: DataResponse<string>;
+                        beforeEach(() => {
+                            das.tryMemoryCacheFetching = jest.fn().mockResolvedValue(cacheDataExpired);
+                            contentOfSaveCache = { result: cacheDataNotExpired.payload, source: DataSource.MemoryCache };
+                            das.tryPersistentStorageFetching = jest.fn();
+                        });
+                        it("calls call tryPersistentStorageFetching", async () => {
+                            await das.fetchFresh(request);
+                            expect(das.tryPersistentStorageFetching).toHaveBeenCalledTimes(1);
+                        });
+                    });
+                });
             });
-            describe("when tryPersistentStorageFetching fails patrick", () => {
+            describe("when tryPersistentStorageFetching fails", () => {
                 beforeEach(() => {
                     das.tryPersistentStorageFetching = jest.fn().mockRejectedValue("tryPersistentStorageFetchingFail");
                     das.stopPerformanceInsight = jest.fn();
@@ -1080,8 +1168,8 @@ describe("DataAccessSingleton", () => {
             beforeEach(() => {
                 requestWithId.memoryCache = undefined;
             });
-            it("returns undefined", async () => {
-                const result = await das.tryMemoryCacheFetching(requestWithId);
+            it("returns undefined", () => {
+                const result = das.tryMemoryCacheFetching(requestWithId);
                 expect(result).toBeUndefined();
             });
         });
@@ -1089,8 +1177,8 @@ describe("DataAccessSingleton", () => {
             beforeEach(() => {
                 das.options.isCacheEnabled = false;
             });
-            it("returns undefined", async () => {
-                const result = await das.tryMemoryCacheFetching(requestWithId);
+            it("returns undefined", () => {
+                const result = das.tryMemoryCacheFetching(requestWithId);
                 expect(result).toBeUndefined();
             });
         });
@@ -1103,8 +1191,8 @@ describe("DataAccessSingleton", () => {
                     das.getMemoryStoreData = jest.fn().mockReturnValue(cacheDataExpired);
                     das.deleteFromMemoryCache = jest.fn();
                 });
-                it("deletes the data from the cache", async () => {
-                    await das.tryMemoryCacheFetching(requestWithId);
+                it("deletes the data from the cache", () => {
+                    das.tryMemoryCacheFetching(requestWithId);
                     expect(das.deleteFromMemoryCache).toHaveBeenCalledTimes(1);
                 });
             });
@@ -1113,9 +1201,9 @@ describe("DataAccessSingleton", () => {
                     das.getMemoryStoreData = jest.fn().mockReturnValue(cacheDataNotExpired);
                     das.deleteFromMemoryCache = jest.fn();
                 });
-                it("returns the data with memory cache source", async () => {
-                    const result = await das.tryMemoryCacheFetching(requestWithId);
-                    expect(result.source).toBe(DataSource.MemoryCache);
+                it("returns the data with memory cache source", () => {
+                    const result = das.tryMemoryCacheFetching(requestWithId);
+                    expect(result.payload).toBe("Test");
                 });
             });
         });
@@ -1123,19 +1211,14 @@ describe("DataAccessSingleton", () => {
             beforeEach(() => {
                 das.getMemoryStoreData = jest.fn().mockReturnValue(undefined);
             });
-            it("returns undefined", async () => {
-                const result = await das.tryMemoryCacheFetching(requestWithId);
+            it("returns undefined", () => {
+                const result = das.tryMemoryCacheFetching(requestWithId);
                 expect(result).toBeUndefined();
             });
         });
     });
     describe("tryPersistentStorageFetching", () => {
-        beforeEach(() => {
-            requestWithId.persistentCache = {
-                lifespanInSeconds: 120
-            };
-        });
-        describe("when cache configuration is undefined", () => {
+        describe("when persistent cache configuration is undefined", () => {
             beforeEach(() => {
                 requestWithId.persistentCache = undefined;
             });
@@ -1144,150 +1227,170 @@ describe("DataAccessSingleton", () => {
                 expect(result).toBeUndefined();
             });
         });
-        describe("when cache disabled", () => {
+        describe("when persistent cache configuration is null", () => {
             beforeEach(() => {
-                das.options.isCacheEnabled = false;
+                requestWithId.persistentCache = null;
             });
             it("returns undefined", async () => {
                 const result = await das.tryPersistentStorageFetching(requestWithId);
                 expect(result).toBeUndefined();
             });
         });
-        describe("when cache enabled", () => {
+        describe("when persistent cache is configured", () => {
             beforeEach(() => {
-                das.options.isCacheEnabled = true;
+                requestWithId.persistentCache = {
+                    lifespanInSeconds: 120
+                };
             });
-            describe("when persistent cache has an expired data", () => {
+            describe("when cache disabled", () => {
                 beforeEach(() => {
-                    das.getPersistentStoreData = jest.fn().mockResolvedValue(cacheDataExpired);
-                    das.deleteFromPersistentStorage = jest.fn().mockResolvedValue(cacheDataExpired);
+                    das.options.isCacheEnabled = false;
                 });
-                it("deletes the data from the cache", async () => {
-                    await das.tryPersistentStorageFetching(requestWithId);
-                    expect(das.deleteFromPersistentStorage).toHaveBeenCalledTimes(1);
-                });
-                describe("when fail to remove", () => {
-                    beforeEach(() => {
-                        das.deleteFromPersistentStorage = jest.fn().mockRejectedValue("Test");
-                        das.options.logError = jest.fn();
-                    });
-                    it("calls the option log", async () => {
-                        try {
-                            await das.tryPersistentStorageFetching(requestWithId);
-                            expect(das.options.logError).toHaveBeenCalledTimes(1);
-                        } catch {}
-                    });
-                });
-            });
-            describe("when persistent cache has a fresh data", () => {
-                beforeEach(() => {
-                    das.getPersistentStoreData = jest.fn().mockResolvedValue(cacheDataNotExpired);
-                });
-                it("returns the data with memory cache source", async () => {
+                it("returns undefined", async () => {
                     const result = await das.tryPersistentStorageFetching(requestWithId);
-                    expect(result.source).toBe(DataSource.PersistentStorageCache);
+                    expect(result).toBeUndefined();
                 });
             });
-        });
-        describe("when doesn't have the data", () => {
-            beforeEach(() => {
-                das.getPersistentStoreData = jest.fn().mockResolvedValue(undefined);
-            });
-            it("returns undefined", async () => {
-                const result = await das.tryPersistentStorageFetching(requestWithId);
-                expect(result).toBeUndefined();
-            });
-        });
-        describe("when reject promise", () => {
-            beforeEach(() => {
-                das.getPersistentStoreData = jest.fn().mockRejectedValue("Test");
-                das.options.logError = jest.fn();
-            });
-            it("calls the option log", async () => {
-                try {
-                    await das.tryPersistentStorageFetching(requestWithId);
-                    expect(das.options.logError).toHaveBeenCalledTimes(1);
-                } catch {}
-            });
-        });
-        describe("deleteDataFromCache", () => {
-            let requestWithId: AjaxRequestWithCache;
-            beforeEach(() => {
-                requestWithId = { id: "1", request: getMockAxiosRequestConfig() };
-            });
-            describe("when no option", () => {
+            describe("when cache enabled", () => {
                 beforeEach(() => {
-                    das.deleteFromMemoryCache = jest.fn().mockRejectedValue("deleteFromMemoryCacheFail");
-                    das.deleteFromPersistentStorage = jest.fn().mockRejectedValue("deleteFromPersistentStorageFail");
+                    das.options.isCacheEnabled = true;
                 });
-                it("removes it from the memory cache", () => {
-                    das.deleteDataFromCache(requestWithId);
-                    expect(das.deleteFromMemoryCache).toHaveBeenCalledTimes(1);
-                });
-                it("removes it from the persistent cache", () => {
-                    das.deleteDataFromCache(requestWithId);
-                    expect(das.deleteFromPersistentStorage).toHaveBeenCalledTimes(1);
-                });
-            });
-            describe("when option", () => {
-                beforeEach(() => {
-                    das.deleteFromMemoryCache = jest.fn().mockRejectedValue("deleteFromMemoryCacheFail");
-                    das.deleteFromPersistentStorage = jest.fn().mockRejectedValue("deleteFromPersistentStorageFail");
-                });
-                describe("when memory option only", () => {
-                    let options: DeleteCacheOptions;
+                describe("when persistent cache has an expired data", () => {
                     beforeEach(() => {
-                        options = { memory: true };
+                        das.getPersistentStoreData = jest.fn().mockResolvedValue(cacheDataExpired);
+                        das.deleteFromPersistentStorage = jest.fn().mockResolvedValue(cacheDataExpired);
+                    });
+                    it("deletes the data from the cache", async () => {
+                        await das.tryPersistentStorageFetching(requestWithId);
+                        expect(das.deleteFromPersistentStorage).toHaveBeenCalledTimes(1);
+                    });
+                    describe("when fail to remove", () => {
+                        beforeEach(() => {
+                            das.deleteFromPersistentStorage = jest.fn().mockRejectedValue("Test");
+                            das.options.logError = jest.fn();
+                        });
+                        it("calls the option log", async () => {
+                            try {
+                                await das.tryPersistentStorageFetching(requestWithId);
+                                expect(das.options.logError).toHaveBeenCalledTimes(1);
+                            } catch {}
+                        });
+                    });
+                });
+                describe("when persistent cache has a fresh data", () => {
+                    beforeEach(() => {
+                        das.getPersistentStoreData = jest.fn().mockResolvedValue(cacheDataNotExpired);
+                    });
+                    it("returns the data with memory cache source", async () => {
+                        const result = await das.tryPersistentStorageFetching(requestWithId);
+                        expect(result.source).toBe(DataSource.PersistentStorageCache);
+                    });
+                });
+            });
+            describe("when doesn't have the data", () => {
+                beforeEach(() => {
+                    das.getPersistentStoreData = jest.fn().mockResolvedValue(undefined);
+                });
+                it("returns undefined", async () => {
+                    const result = await das.tryPersistentStorageFetching(requestWithId);
+                    expect(result).toBeUndefined();
+                });
+            });
+            describe("when reject promise", () => {
+                beforeEach(() => {
+                    das.getPersistentStoreData = jest.fn().mockRejectedValue("Test");
+                    das.options.logError = jest.fn();
+                });
+                it("calls the option log", async () => {
+                    try {
+                        await das.tryPersistentStorageFetching(requestWithId);
+                        expect(das.options.logError).toHaveBeenCalledTimes(1);
+                    } catch {}
+                });
+            });
+            describe("deleteDataFromCache", () => {
+                let requestWithId: AjaxRequestWithCache;
+                beforeEach(() => {
+                    requestWithId = { id: "1", request: getMockAxiosRequestConfig() };
+                });
+                describe("when no option", () => {
+                    beforeEach(() => {
+                        das.deleteFromMemoryCache = jest.fn().mockRejectedValue("deleteFromMemoryCacheFail");
+                        das.deleteFromPersistentStorage = jest
+                            .fn()
+                            .mockRejectedValue("deleteFromPersistentStorageFail");
                     });
                     it("removes it from the memory cache", () => {
-                        das.deleteDataFromCache(requestWithId, options);
+                        das.deleteDataFromCache(requestWithId);
                         expect(das.deleteFromMemoryCache).toHaveBeenCalledTimes(1);
                     });
-                    it("does NOT remove it from the persistent cache", () => {
-                        das.deleteDataFromCache(requestWithId, options);
-                        expect(das.deleteFromPersistentStorage).toHaveBeenCalledTimes(0);
-                    });
-                });
-                describe("when memory option true, persistence false", () => {
-                    let options: DeleteCacheOptions;
-                    beforeEach(() => {
-                        options = { memory: true, persistent: false };
-                    });
-                    it("removes it from the memory cache", () => {
-                        das.deleteDataFromCache(requestWithId, options);
-                        expect(das.deleteFromMemoryCache).toHaveBeenCalledTimes(1);
-                    });
-                    it("does NOT remove it from the persistent cache", () => {
-                        das.deleteDataFromCache(requestWithId, options);
-                        expect(das.deleteFromPersistentStorage).toHaveBeenCalledTimes(0);
-                    });
-                });
-                describe("when persistence option only", () => {
-                    let options: DeleteCacheOptions;
-                    beforeEach(() => {
-                        options = { persistent: true };
-                    });
-                    it("removes it from the memory cache", () => {
-                        das.deleteDataFromCache(requestWithId, options);
-                        expect(das.deleteFromMemoryCache).toHaveBeenCalledTimes(0);
-                    });
-                    it("does NOT remove it from the persistent cache", () => {
-                        das.deleteDataFromCache(requestWithId, options);
+                    it("removes it from the persistent cache", () => {
+                        das.deleteDataFromCache(requestWithId);
                         expect(das.deleteFromPersistentStorage).toHaveBeenCalledTimes(1);
                     });
                 });
-                describe("when persistence true, memory false", () => {
-                    let options: DeleteCacheOptions;
+                describe("when option", () => {
                     beforeEach(() => {
-                        options = { persistent: true, memory: false };
+                        das.deleteFromMemoryCache = jest.fn().mockRejectedValue("deleteFromMemoryCacheFail");
+                        das.deleteFromPersistentStorage = jest
+                            .fn()
+                            .mockRejectedValue("deleteFromPersistentStorageFail");
                     });
-                    it("removes it from the memory cache", () => {
-                        das.deleteDataFromCache(requestWithId, options);
-                        expect(das.deleteFromMemoryCache).toHaveBeenCalledTimes(0);
+                    describe("when memory option only", () => {
+                        let options: DeleteCacheOptions;
+                        beforeEach(() => {
+                            options = { memory: true };
+                        });
+                        it("removes it from the memory cache", () => {
+                            das.deleteDataFromCache(requestWithId, options);
+                            expect(das.deleteFromMemoryCache).toHaveBeenCalledTimes(1);
+                        });
+                        it("does NOT remove it from the persistent cache", () => {
+                            das.deleteDataFromCache(requestWithId, options);
+                            expect(das.deleteFromPersistentStorage).toHaveBeenCalledTimes(0);
+                        });
                     });
-                    it("does NOT remove it from the persistent cache", () => {
-                        das.deleteDataFromCache(requestWithId, options);
-                        expect(das.deleteFromPersistentStorage).toHaveBeenCalledTimes(1);
+                    describe("when memory option true, persistence false", () => {
+                        let options: DeleteCacheOptions;
+                        beforeEach(() => {
+                            options = { memory: true, persistent: false };
+                        });
+                        it("removes it from the memory cache", () => {
+                            das.deleteDataFromCache(requestWithId, options);
+                            expect(das.deleteFromMemoryCache).toHaveBeenCalledTimes(1);
+                        });
+                        it("does NOT remove it from the persistent cache", () => {
+                            das.deleteDataFromCache(requestWithId, options);
+                            expect(das.deleteFromPersistentStorage).toHaveBeenCalledTimes(0);
+                        });
+                    });
+                    describe("when persistence option only", () => {
+                        let options: DeleteCacheOptions;
+                        beforeEach(() => {
+                            options = { persistent: true };
+                        });
+                        it("removes it from the memory cache", () => {
+                            das.deleteDataFromCache(requestWithId, options);
+                            expect(das.deleteFromMemoryCache).toHaveBeenCalledTimes(0);
+                        });
+                        it("does NOT remove it from the persistent cache", () => {
+                            das.deleteDataFromCache(requestWithId, options);
+                            expect(das.deleteFromPersistentStorage).toHaveBeenCalledTimes(1);
+                        });
+                    });
+                    describe("when persistence true, memory false", () => {
+                        let options: DeleteCacheOptions;
+                        beforeEach(() => {
+                            options = { persistent: true, memory: false };
+                        });
+                        it("removes it from the memory cache", () => {
+                            das.deleteDataFromCache(requestWithId, options);
+                            expect(das.deleteFromMemoryCache).toHaveBeenCalledTimes(0);
+                        });
+                        it("does NOT remove it from the persistent cache", () => {
+                            das.deleteDataFromCache(requestWithId, options);
+                            expect(das.deleteFromPersistentStorage).toHaveBeenCalledTimes(1);
+                        });
                     });
                 });
             });

@@ -207,45 +207,32 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         const requestInternal = this.setDefaultRequestValues(request, FetchType.Fresh); // Default values
         this.setDefaultCache(requestInternal); // We enforce a minimum memory cache of few seconds
         this.startPerformanceInsight(requestInternal.id); // Full fetch performance
-        try {
-            this.startPerformanceInsight(requestInternal.id, DataSource.MemoryCache); // Performance for memory only
-            const memoryCacheValue: DataResponse<T> | undefined = await this.tryMemoryCacheFetching<T>(requestInternal);
-            this.stopPerformanceInsight(requestInternal.id, DataSource.MemoryCache); // Performance for memory only is stopped
-            if (memoryCacheValue !== undefined) {
-                this.stopPerformanceInsight(requestInternal.id); // Stop performance for the whole fetch
-                this.logInfo({
-                    action: DataAction.Use,
-                    id: requestInternal.id,
-                    url: requestInternal.request.url!,
-                    source: DataSource.MemoryCache,
-                    performanceInsight: this.setDataSize(
-                        this.getPerformanceInsight(requestInternal.id),
-                        memoryCacheValue.result
-                    ),
-                    dataSignature: this.writeSignature(memoryCacheValue.result),
-                    fetchType: requestInternal.fetchType,
-                    httpMethod: requestInternal.httpMethod
-                });
-                this.deletePerformanceInsight(requestInternal.id);
-                return this.saveCache(requestInternal, {
-                    source: DataSource.MemoryCache,
-                    result: memoryCacheValue.result
-                });
-            }
-        } catch (reason) {
-            this.stopPerformanceInsight(requestInternal.id);
-            this.logError({
+        this.startPerformanceInsight(requestInternal.id, DataSource.MemoryCache); // Performance for memory only
+        const memoryCacheValue: CachedData<T> | undefined = this.tryMemoryCacheFetching<T>(requestInternal);
+        this.stopPerformanceInsight(requestInternal.id, DataSource.MemoryCache); // Performance for memory only is stopped
+        if (
+            memoryCacheValue !== undefined &&
+            new Date().getTime() <= new Date(memoryCacheValue.expirationDateTime).getTime()
+        ) {
+            this.stopPerformanceInsight(requestInternal.id); // Stop performance for the whole fetch
+            this.logInfo({
+                action: DataAction.Use,
                 id: requestInternal.id,
                 url: requestInternal.request.url!,
-                error: reason,
                 source: DataSource.MemoryCache,
-                action: DataAction.Fetch,
-                performanceInsight: this.getPerformanceInsight(requestInternal.id),
+                performanceInsight: this.setDataSize(
+                    this.getPerformanceInsight(requestInternal.id),
+                    memoryCacheValue.payload
+                ),
+                dataSignature: this.writeSignature(memoryCacheValue.payload),
                 fetchType: requestInternal.fetchType,
                 httpMethod: requestInternal.httpMethod
             });
             this.deletePerformanceInsight(requestInternal.id);
-            throw reason;
+            return this.saveCache(requestInternal, {
+                source: DataSource.MemoryCache,
+                result: memoryCacheValue.payload
+            });
         }
 
         try {
@@ -381,7 +368,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         }
 
         // Check memory cache first
-        const memoryCacheEntry: CachedData<T> | undefined = this.getMemoryStoreData(requestInternal);
+        const memoryCacheEntry: CachedData<T> | undefined = this.tryMemoryCacheFetching(requestInternal);
         if (memoryCacheEntry === undefined) {
             let persistentStorageValue: CachedData<T> | undefined = undefined;
             // Not in memory, check in long term storage
@@ -425,7 +412,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             } else {
                 // We have something from the persistent cache
                 const persistentStorageEntry = persistentStorageValue;
-                if (requestInternal.memoryCache !== undefined) {
+                if (requestInternal.memoryCache !== undefined && requestInternal.memoryCache !== null) {
                     this.addInMemoryCache(requestInternal, persistentStorageEntry.payload);
                 }
                 // It's expired which mean we fetch to get fresh data HOWEVER, we will return the obsolete data to have a fast response
@@ -530,7 +517,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                     fetchType: requestInternal.fetchType,
                     httpMethod: requestInternal.httpMethod
                 });
-                if (error.message !== ERROR_HANDLED_MSG) { // To improve. At the moment, trick to avoid double sending
+                if (error.message !== ERROR_HANDLED_MSG) {
+                    // To improve. At the moment, trick to avoid double sending
                     this.options.onBackgroundAjaxFetchFailure(error);
                 }
                 throw error;
@@ -583,10 +571,10 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         responseFromCacheOrAjax: DataResponse<T>
     ): Promise<DataResponse<T>> {
         // At the end, we check if we need to store in any of the cache
-        if (requestInternal.memoryCache !== undefined) {
+        if (requestInternal.memoryCache !== undefined && requestInternal.memoryCache !== null) {
             this.addInMemoryCache(requestInternal, responseFromCacheOrAjax.result);
         }
-        if (requestInternal.persistentCache !== undefined) {
+        if (requestInternal.persistentCache !== undefined && requestInternal.persistentCache !== null) {
             const currentUTCDataWithLifeSpanAdded = new Date(
                 new Date().getTime() + requestInternal.persistentCache.lifespanInSeconds * 1000
             );
@@ -599,9 +587,13 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         return Promise.resolve(responseFromCacheOrAjax);
     }
 
-    public tryMemoryCacheFetching<T>(requestInternal: AjaxRequestInternal): Promise<DataResponse<T> | undefined> {
-        if (this.options.isCacheEnabled === false || requestInternal.memoryCache === undefined) {
-            return Promise.resolve(undefined);
+    public tryMemoryCacheFetching<T>(requestInternal: AjaxRequestInternal): CachedData<T> | undefined {
+        if (
+            this.options.isCacheEnabled === false ||
+            requestInternal.memoryCache === undefined ||
+            requestInternal.memoryCache === null
+        ) {
+            return undefined;
         }
         const cacheEntry: CachedData<T> | undefined = this.getMemoryStoreData(requestInternal);
         if (cacheEntry !== undefined) {
@@ -609,21 +601,22 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             if (new Date().getTime() > new Date(cacheEntry.expirationDateTime).getTime()) {
                 // Delete from cache
                 this.deleteFromMemoryCache(requestInternal);
-            } else {
-                // Return the cached response
-                return Promise.resolve({
-                    source: DataSource.MemoryCache,
-                    result: cacheEntry.payload
-                });
             }
+
+            // Return the cached response
+            return cacheEntry;
         }
-        return Promise.resolve(undefined);
+        return undefined;
     }
 
     public async tryPersistentStorageFetching<T>(
         requestInternal: AjaxRequestInternal
     ): Promise<DataResponse<T> | undefined> {
-        if (this.options.isCacheEnabled === false || requestInternal.persistentCache === undefined) {
+        if (
+            this.options.isCacheEnabled === false ||
+            requestInternal.persistentCache === undefined ||
+            requestInternal.persistentCache === null
+        ) {
             return undefined;
         }
         try {

@@ -36,15 +36,17 @@ export interface AjaxRequestWithCache extends AjaxRequest {
     /**
      * The memory cache configuration. It contains the lifespan before ejecting the data from the cache.
      * When not defined is set to X seconds (see constant in the class)
+     * When explicitly set to NULL, the request is not cached even if the option 'isCacheMandatoryIfEnabled' is set to true
      */
-    memoryCache?: CacheConfiguration;
+    memoryCache?: CacheConfiguration | null;
     /**
      * When defined, the data is set into the persistent storage. Subsequent calls will get the data from the persistent storage
      * and returns. This allow to have client-side persistence of a result that is quickly available. The refreshed values
      * are stored in the persistent storage once the response return but won't be pushed to the user until the next call to the
      * save request.
+     * When explicitly set to NULL, the request is not cached even if the option 'isCacheMandatoryIfEnabled' is set to true
      */
-    persistentCache?: CacheConfiguration;
+    persistentCache?: CacheConfiguration | null;
 }
 
 export interface AjaxRequestInternal extends AjaxRequestWithCache {
