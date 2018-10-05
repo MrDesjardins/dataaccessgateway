@@ -893,11 +893,16 @@ describe("DataAccessSingleton", () => {
                 });
                 describe("when data in memory cache has NOT expired", () => {
                     beforeEach(() => {
+                        das.fetchAndSaveInCacheIfExpired = jest.fn().mockReturnValue(dataResponseFromCache);
                         das.getMemoryStoreData = jest.fn().mockReturnValue(cacheDataNotExpired);
                     });
                     it("invokes fetch (but won't fetch)", () => {
                         das.fetchFastAndFresh(request);
                         expect(das.fetchAndSaveInCacheIfExpired).toHaveBeenCalledTimes(1);
+                    });
+                    it("sets the promise of the fetch in the dual response to undefined", async () => {
+                        const result = await das.fetchFastAndFresh(request);
+                        expect(result.webPromise).toBeUndefined();
                     });
                 });
             });
@@ -935,6 +940,7 @@ describe("DataAccessSingleton", () => {
                 describe("when data in persistent cache has NOT expired", () => {
                     beforeEach(() => {
                         das.getPersistentStoreData = jest.fn().mockResolvedValue(cacheDataNotExpired);
+                        das.fetchAndSaveInCacheIfExpired = jest.fn().mockReturnValue(dataResponseFromCache);
                         das.addInMemoryCache = jest.fn();
                     });
                     it("invokes fetch (but won't fetch)", async () => {
@@ -943,7 +949,7 @@ describe("DataAccessSingleton", () => {
                     });
                     it("sets the promise of the fetch in the dual response", async () => {
                         const result = await das.fetchFastAndFresh(request);
-                        expect(result.webPromise).toBeDefined(); // The promise might contains a Promise.resolve with the Persistent Storage value if not expired ! [P] To work on that. At the moment, require to consumer to check the DataSource to see if HTTP
+                        expect(result.webPromise).toBeUndefined();
                     });
                     describe("when memory cache enabled", () => {
                         beforeEach(() => {
@@ -2380,6 +2386,26 @@ describe("DataAccessSingleton", () => {
             });
             it("returns different hash", () => {
                 expect(das.hashCode(obj1)).not.toEqual(das.hashCode(obj2));
+            });
+        });
+    });
+    describe("isPromise", () => {
+        describe("when DataResponse is the object", () => {
+            let input: DataResponse<string>;
+            beforeEach(() => {
+                input = getDataResponse("Test");
+            });
+            it("returns false", () => {
+                expect(das.isPromise(input)).toBeFalsy();
+            });
+        });
+        describe("when Promise<DataResponse> is the object", () => {
+            let input: Promise<DataResponse<string>>;
+            beforeEach(() => {
+                input = Promise.resolve(getDataResponse("Test"));
+            });
+            it("returns true", () => {
+                expect(das.isPromise(input)).toBeTruthy();
             });
         });
     });
