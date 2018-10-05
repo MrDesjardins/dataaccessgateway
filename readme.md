@@ -121,6 +121,43 @@ Here is the flow for `fetchWeb`.
 
 ![alt text](https://github.com/MrDesjardins/dataaccessgateway/raw/master/images/fetchWebFlowDiagram.png "Fetch Web Flow Diagram")
 
+## Fetch FastAndFresh
+
+### What
+
+The function, `fetchFastAndFresh` returns the data from any cache (memory first, then persistent cache second) if available regardless of the expiration. However, it will fetch in the background and fills the caches giving the opportunity to subsequent calls to have fresh values. So far, it is the same as `fetchFast`. However, the major difference is that `fetchFastAndFresh` returns a `DataDualResponse` which has a `Promise<T>` of the web request. The goal of this function is to render a first time very quickly (from the cache) and to expect to receive second callback (from the promise in the response) to render a second time accurately with fresh data.
+
+### When
+
+Use this function if you want a very fast response when displaying but that a fresh version is required. See this as a better "spinner experience". For exemple, you may display in a dashboard obsolete information for few milliseconds instead of a spinner by using the result from the return value of `fetchFastAndFresh` and to use the result's promise to refresh the dashboard with more recent data.
+
+### Graph
+
+Here is the flow from the actor request call up to when the data is coming back.
+
+![alt text](https://github.com/MrDesjardins/dataaccessgateway/raw/master/images/fastAndFreshFlowDiagram.png "Fast and Fresh Flow Diagram")
+
+### Examples
+
+#### Simple
+
+This is the most basic call. It uses many defaults. This will have a memory cache and persisted cache of 5 minutes and use the URL has unique key for every request. The unique key is used for two purposes. The first purpose is to make sure that only one unique query is executed at the same time and the second goal is to store the data in the cache.
+```
+// Normal Axios Request
+const request: AxiosRequestConfig = { method: "GET", url: url};
+
+// Execute the request through DataAccessGateway
+const response = await DataAccessGateway("AppName").fastAndFreshFlowDiagram.png<YourEntityResponse>({request: request});
+
+// Render the user interface with response.result
+// Subscribe to the promise of the response to update with fresh data later
+const webPromise = response.webPromise;
+if(webPromise !== undefined){
+    responseWeb = await webPromise; // It's defined, thus we will get new data
+    // Render the user interface a second time with responseWeb by using responseWeb.result
+}
+``` 
+
 ## Execute
 
 ### What
