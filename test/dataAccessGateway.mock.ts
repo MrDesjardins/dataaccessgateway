@@ -18,7 +18,7 @@ export function getMockAjaxRequestWithId(id: string): AjaxRequestInternal {
         id: id,
         fetchType: FetchType.Fast,
         request: getMockAxiosRequestConfig(),
-        httpMethod: undefined
+        httpMethod: HttpMethod.GET
     };
 }
 
@@ -62,7 +62,7 @@ export interface PromiseRetarder {
 export function getPromiseRetarder(): PromiseRetarder {
     return (function() {
         return {
-            promise: new Promise(function(resolve, reject) {
+            promise: new Promise(function(this: any, resolve, reject) {
                 this.resolveNow = resolve;
                 this.rejectNow = reject;
             }),

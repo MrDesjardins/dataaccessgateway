@@ -1,5 +1,7 @@
 import { AxiosRequestConfig } from "axios";
 
+export type CachedType = string | object;
+
 export enum FetchType {
     Fast = "Fast",
     Fresh = "Fresh",
@@ -97,7 +99,7 @@ export enum DataAction {
     RemoveFromOnGoingRequest = "RemoveFromOnGoingRequest",
     System = "System"
 }
-export interface DataResponse<T> {
+export interface DataResponse<T extends object | string> {
     source: DataSource;
     result: T;
     dataBirthdateMs: number;

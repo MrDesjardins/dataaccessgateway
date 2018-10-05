@@ -1,6 +1,6 @@
 import axios, { AxiosError, AxiosPromise, AxiosRequestConfig, AxiosResponse } from "axios";
 import Dexie from "dexie";
-import { AjaxRequest, AjaxRequestExecute, AjaxRequestInternal, AjaxRequestWithCache, CacheDataWithId, CachedData, DataAction, DataResponse, DataSource, FetchType, HttpMethod, LogError, LogInfo, OnGoingAjaxRequest, PerformanceRequestInsight } from "./model";
+import { AjaxRequest, AjaxRequestExecute, AjaxRequestInternal, AjaxRequestWithCache, CacheDataWithId, CachedData, CachedType, DataAction, DataResponse, DataSource, FetchType, HttpMethod, LogError, LogInfo, OnGoingAjaxRequest, PerformanceRequestInsight } from "./model";
 export class DataAccessIndexDbDatabase extends Dexie {
     public data!: Dexie.Table<CacheDataWithId<any>, string>; // Will be initialized later
 
@@ -35,14 +35,17 @@ export interface DataAccessSingletonOptions {
  */
 export interface IDataAccessSingleton {
     setConfiguration(options?: Partial<DataAccessSingletonOptions>): void;
-    fetch<T>(fetchType: FetchType, request: AjaxRequestWithCache): Promise<DataResponse<T>>;
-    fetchFresh<T>(request: AjaxRequestWithCache): Promise<DataResponse<T>>;
-    fetchFast<T>(request: AjaxRequestWithCache): Promise<DataResponse<T>>;
-    fetchWeb<T>(request: AjaxRequestWithCache): Promise<DataResponse<T>>;
+    fetch<T extends CachedType>(fetchType: FetchType, request: AjaxRequestWithCache): Promise<DataResponse<T>>;
+    fetchFresh<T extends CachedType>(request: AjaxRequestWithCache): Promise<DataResponse<T>>;
+    fetchFast<T extends CachedType>(request: AjaxRequestWithCache): Promise<DataResponse<T>>;
+    fetchWeb<T extends CachedType>(request: AjaxRequestWithCache): Promise<DataResponse<T>>;
     deleteDataFromCache(request: AjaxRequest, options?: DeleteCacheOptions): Promise<void>;
     deletePersistentStorage(name: string): Promise<void>;
-    forceDeleteAndFetch<T>(request: AjaxRequestWithCache, options?: DeleteCacheOptions): Promise<DataResponse<T>>;
-    execute<T>(request: AjaxRequestExecute): Promise<DataResponse<T>>;
+    forceDeleteAndFetch<T extends CachedType>(
+        request: AjaxRequestWithCache,
+        options?: DeleteCacheOptions
+    ): Promise<DataResponse<T>>;
+    execute<T extends CachedType>(request: AjaxRequestExecute): Promise<DataResponse<T>>;
 }
 
 export interface DeleteCacheOptions {
@@ -160,7 +163,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         }
     }
 
-    public fetch<T>(fetchType: FetchType, request: AjaxRequestWithCache): Promise<DataResponse<T>> {
+    public fetch<T extends CachedType>(fetchType: FetchType, request: AjaxRequestWithCache): Promise<DataResponse<T>> {
         switch (fetchType) {
             case FetchType.Fast:
                 return this.fetchFast(request);
@@ -174,7 +177,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 return this.fetchFast(request);
         }
     }
-    public async fetchWeb<T>(request: AjaxRequestWithCache): Promise<DataResponse<T>> {
+    public async fetchWeb<T extends CachedType>(request: AjaxRequestWithCache): Promise<DataResponse<T>> {
         const requestInternal = this.setDefaultRequestValues(request, FetchType.Web); // Default values
         this.startPerformanceInsight(requestInternal.id);
         try {
@@ -205,7 +208,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
      * wait the response to cache it and return it. It means that each time the data is obsolete that the fetch takes time but
      * subsequent request will be faster. This function focus on accuracy first.
      */
-    public async fetchFresh<T>(request: AjaxRequestWithCache): Promise<DataResponse<T>> {
+    public async fetchFresh<T extends CachedType>(request: AjaxRequestWithCache): Promise<DataResponse<T>> {
         const requestInternal = this.setDefaultRequestValues(request, FetchType.Fresh); // Default values
         this.setDefaultCache(requestInternal); // We enforce a minimum memory cache of few seconds
         this.startPerformanceInsight(requestInternal.id); // Full fetch performance
@@ -325,7 +328,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
      * understand that the fetch fast principle is that it's better to return a stale value than nothing BUT will respect the lifespan
      * to fetch the new value. Fetch fast works better if most of the data (if not all) is stored with a persistence
      */
-    public async fetchFast<T>(request: AjaxRequestWithCache): Promise<DataResponse<T>> {
+    public async fetchFast<T extends CachedType>(request: AjaxRequestWithCache): Promise<DataResponse<T>> {
         const requestInternal = this.setDefaultRequestValues(request, FetchType.Fast); // Default values
         this.setDefaultFastCache(requestInternal); // We enforce a minimum memory cache of few seconds
         this.startPerformanceInsight(requestInternal.id);
@@ -480,7 +483,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         }
     }
 
-    public async fetchAndSaveInCacheIfExpired<T>(
+    public async fetchAndSaveInCacheIfExpired<T extends CachedType>(
         requestInternal: AjaxRequestInternal,
         source: DataSource,
         cacheEntry?: CachedData<T> | undefined
@@ -573,7 +576,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         }
     }
 
-    public saveCache<T>(
+    public saveCache<T extends CachedType>(
         requestInternal: AjaxRequestInternal,
         responseFromCacheOrAjax: DataResponse<T>
     ): Promise<DataResponse<T>> {
@@ -617,7 +620,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         return undefined;
     }
 
-    public async tryPersistentStorageFetching<T>(
+    public async tryPersistentStorageFetching<T extends CachedType>(
         requestInternal: AjaxRequestInternal
     ): Promise<DataResponse<T> | undefined> {
         if (
@@ -673,7 +676,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
     public ajax(request: AxiosRequestConfig): AxiosPromise<any> {
         return axios(request);
     }
-    public fetchWithAjax<T>(requestInternal: AjaxRequestInternal): AxiosPromise<T> {
+    public fetchWithAjax<T extends CachedType>(requestInternal: AjaxRequestInternal): AxiosPromise<T> {
         // Check if already on-going request
         const cacheOnGoingEntry: OnGoingAjaxRequest | undefined = this.onGoingAjaxRequest.get(requestInternal.id);
         if (cacheOnGoingEntry === undefined) {
@@ -865,11 +868,11 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         this.onGoingAjaxRequest.delete(requestInternal.id);
     }
 
-    public addInMemoryCache<T>(requestInternal: AjaxRequestInternal, dataToAdd: T): void {
+    public addInMemoryCache<T extends CachedType>(requestInternal: AjaxRequestInternal, dataToAdd: T): void {
         const id = requestInternal.id;
         const url = requestInternal.request.url!;
         const lifespanInSeconds = requestInternal.memoryCache!.lifespanInSeconds;
-        const currentDateTimeMs = this.getCurrentDateTimeMs()
+        const currentDateTimeMs = this.getCurrentDateTimeMs();
         const currentUTCDataWithLifeSpanAdded = currentDateTimeMs + lifespanInSeconds * 1000;
         const cacheData: CachedData<T> = {
             expirationDateTimeMs: currentUTCDataWithLifeSpanAdded,
@@ -889,7 +892,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         });
     }
 
-    public async addInPersistentStore<T>(
+    public async addInPersistentStore<T extends CachedType>(
         requestInternal: AjaxRequestInternal,
         cacheData: CachedData<T>
     ): Promise<void> {
@@ -1051,7 +1054,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         }
     }
 
-    public async forceDeleteAndFetch<T>(
+    public async forceDeleteAndFetch<T extends CachedType>(
         request: AjaxRequestWithCache,
         options?: DeleteCacheOptions
     ): Promise<DataResponse<T>> {
@@ -1093,7 +1096,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         }
     }
 
-    public writeSignature<T>(payload: T): string {
+    public writeSignature<T extends CachedType>(payload: T): string {
         if (!this.generateSignature) {
             return "";
         }
@@ -1104,7 +1107,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         return this.hashCode(objToHash);
     }
 
-    public async execute<T>(request: AjaxRequestExecute): Promise<DataResponse<T>> {
+    public async execute<T extends CachedType>(request: AjaxRequestExecute): Promise<DataResponse<T>> {
         const requestInternal = this.setDefaultRequestValues(request, FetchType.Execute); // Default values
         this.startPerformanceInsight(requestInternal.id);
         this.startPerformanceInsight(requestInternal.id, DataSource.HttpRequest);
@@ -1158,7 +1161,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         }
     }
 
-    public hashCode(toHash: string | object): string {
+    public hashCode(toHash: CachedType): string {
         let str: string;
         if (typeof toHash === "string") {
             str = toHash;
@@ -1178,7 +1181,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
     }
 
     public getCurrentDateTimeMs(): number {
-        return this.getCurrentDateTimeMs()
+        return this.getCurrentDateTimeMs();
     }
 }
 const DataAccessGateway: (databaseName: string) => IDataAccessSingleton = (databaseName: string = "DatabaseName") =>

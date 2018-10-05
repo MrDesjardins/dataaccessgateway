@@ -1,8 +1,8 @@
 import { AxiosResponse } from "axios";
 import { Dexie } from "dexie";
 import { DataAccessIndexDbDatabase, DataAccessSingleton, DeleteCacheOptions } from "../src/dataAccessGateway";
-import { AjaxRequestInternal, AjaxRequestWithCache, CacheConfiguration, CachedData, DataResponse, DataSource, FetchType, HttpMethod, OnGoingAjaxRequest, PerformanceRequestInsight } from "../src/model";
-import { PromiseRetarder, getMockAjaxRequest, getMockAjaxRequestExecute, getMockAjaxRequestInternal, getMockAjaxRequestWithId, getMockAxiosRequestConfig, getMockOnGoingAjaxRequest, getPromiseRetarder } from "./dataAccessGateway.mock";
+import { AjaxRequestInternal, AjaxRequestWithCache, CacheConfiguration, CacheDataWithId, CachedData, DataResponse, DataSource, FetchType, HttpMethod, OnGoingAjaxRequest, PerformanceRequestInsight } from "../src/model";
+import { getMockAjaxRequest, getMockAjaxRequestExecute, getMockAjaxRequestInternal, getMockAjaxRequestWithId, getMockAxiosRequestConfig, getMockOnGoingAjaxRequest, getPromiseRetarder, PromiseRetarder } from "./dataAccessGateway.mock";
 const DATABASE_NAME = "Test";
 interface FakeObject {
     id: string;
@@ -35,7 +35,7 @@ describe("DataAccessIndexDbDatabase", () => {
         didb = new DataAccessIndexDbDatabase("");
     });
     describe("dropTable", () => {
-        describe("when data is definFed", () => {
+        describe("when data is defined", () => {
             beforeEach(() => {
                 didb.data = { clear: () => {} } as any;
                 (didb as any).data.clear = jest.fn();
@@ -43,16 +43,20 @@ describe("DataAccessIndexDbDatabase", () => {
             it("clears data", async () => {
                 expect.assertions(1);
                 await didb.dropTable();
-                expect(didb.data.clear as any).toHaveBeenCalledTimes(1);
+                expect(didb.data!.clear as any).toHaveBeenCalledTimes(1);
             });
         });
         describe("when data is undefined", () => {
             beforeEach(() => {
-                didb.data = undefined;
+                didb.data = {} as Dexie.Table<CacheDataWithId<any>, string>;
             });
             it("rejects the promise", async () => {
                 expect.assertions(1);
-                didb.dropTable().catch(e => expect(e).toBeDefined());
+                try {
+                    await didb.dropTable();
+                } catch (e) {
+                    expect(e).toBeDefined();
+                }
             });
         });
     });
@@ -62,7 +66,7 @@ describe("DataAccessSingleton", () => {
     let request: AjaxRequestWithCache;
     let requestWithId: AjaxRequestInternal;
     let ajaxResponse: AxiosResponse<string>;
-    let spySetDefaultRequestId: jest.SpyInstance<(request: AjaxRequestWithCache, fetchType: FetchType) => void>;
+    let spySetDefaultRequestId: jest.MockInstance<(request: AjaxRequestWithCache, fetchType: FetchType) => void>;
 
     beforeEach(() => {
         das = new DataAccessSingleton(DATABASE_NAME);
@@ -992,7 +996,7 @@ describe("DataAccessSingleton", () => {
                 das.fetchWeb = jest.fn().mockRejectedValue("error");
             });
             it("calls web", async () => {
-                await expect(das.forceDeleteAndFetch(request)).rejects.toThrow();
+                await expect(das.forceDeleteAndFetch(request)).rejects.toEqual("error");
             });
         });
     });
@@ -1125,14 +1129,8 @@ describe("DataAccessSingleton", () => {
                         });
                     });
                     describe("when value is expired", () => {
-                        let contentOfSaveCache: DataResponse<string>;
                         beforeEach(() => {
                             das.tryMemoryCacheFetching = jest.fn().mockResolvedValue(cacheDataExpired);
-                            contentOfSaveCache = {
-                                result: cacheDataNotExpired.payload,
-                                source: DataSource.MemoryCache,
-                                dataBirthdateMs: cacheDataExpired.dataBirthdateMs
-                            };
                             das.tryPersistentStorageFetching = jest.fn();
                         });
                         it("calls call tryPersistentStorageFetching", async () => {
@@ -1220,7 +1218,7 @@ describe("DataAccessSingleton", () => {
                 });
                 it("returns the data with memory cache source", () => {
                     const result = das.tryMemoryCacheFetching(requestWithId);
-                    expect(result.payload).toBe("Test");
+                    expect(result!.payload).toBe("Test");
                 });
             });
         });
@@ -1300,7 +1298,7 @@ describe("DataAccessSingleton", () => {
                     });
                     it("returns the data with memory cache source", async () => {
                         const result = await das.tryPersistentStorageFetching(requestWithId);
-                        expect(result.source).toBe(DataSource.PersistentStorageCache);
+                        expect(result!.source).toBe(DataSource.PersistentStorageCache);
                     });
                 });
             });
@@ -1427,7 +1425,7 @@ describe("DataAccessSingleton", () => {
             it("adds a copy of the data to add", () => {
                 das.addInMemoryCache(requestWithId, originalObject);
                 const result = das.getMemoryStoreData(requestWithId);
-                expect(result.payload).not.toBe(originalObject);
+                expect(result!.payload).not.toBe(originalObject);
             });
         });
         describe("when add an array", () => {
@@ -1439,7 +1437,7 @@ describe("DataAccessSingleton", () => {
             it("returns an array", () => {
                 das.addInMemoryCache(requestWithId, originalArray);
                 const result = das.getMemoryStoreData(requestWithId);
-                expect(result.payload instanceof Array).toBeTruthy();
+                expect(result!.payload instanceof Array).toBeTruthy();
             });
         });
     });
@@ -1646,7 +1644,6 @@ describe("DataAccessSingleton", () => {
                     expect(result.fetch).not.toBe(ref.fetch);
                 });
                 it("has no stop time", () => {
-                    const ref = { ...defaultPerformanceInsight };
                     const result = das.startPerformanceInsight(request, source);
                     expect(result.fetch.stopMs).toBeUndefined();
                 });
@@ -1661,9 +1658,8 @@ describe("DataAccessSingleton", () => {
                     expect(result.httpRequest).not.toBe(ref.httpRequest);
                 });
                 it("has no stop time", () => {
-                    const ref = { ...defaultPerformanceInsight };
                     const result = das.startPerformanceInsight(request, source);
-                    expect(result.httpRequest.stopMs).toBeUndefined();
+                    expect(result.httpRequest!.stopMs).toBeUndefined();
                 });
             });
             describe("when source is MemoryCache", () => {
@@ -1676,9 +1672,8 @@ describe("DataAccessSingleton", () => {
                     expect(result.memoryCache).not.toBe(ref.memoryCache);
                 });
                 it("has no stop time", () => {
-                    const ref = { ...defaultPerformanceInsight };
                     const result = das.startPerformanceInsight(request, source);
-                    expect(result.memoryCache.stopMs).toBeUndefined();
+                    expect(result.memoryCache!.stopMs).toBeUndefined();
                 });
             });
             describe("when source is PersistentStorageCache", () => {
@@ -1691,9 +1686,8 @@ describe("DataAccessSingleton", () => {
                     expect(result.persistentStorageCache).not.toBe(ref.persistentStorageCache);
                 });
                 it("has no stop time", () => {
-                    const ref = { ...defaultPerformanceInsight };
                     const result = das.startPerformanceInsight(request, source);
-                    expect(result.persistentStorageCache.stopMs).toBeUndefined();
+                    expect(result.persistentStorageCache!.stopMs).toBeUndefined();
                 });
             });
             describe("when source is System", () => {
@@ -1756,7 +1750,6 @@ describe("DataAccessSingleton", () => {
                     expect(result.fetch.startMs).toEqual(ref.fetch.startMs);
                 });
                 it("has stop time", () => {
-                    const ref = { ...defaultPerformanceInsight };
                     const result = das.stopPerformanceInsight(request, source);
                     expect(result.fetch.stopMs).toBeDefined();
                 });
@@ -1764,7 +1757,7 @@ describe("DataAccessSingleton", () => {
             describe("when source is HttpRequest", () => {
                 beforeEach(() => {
                     source = DataSource.HttpRequest;
-                    request.httpRequest.startMs = 220;
+                    request.httpRequest!.startMs = 220;
                 });
                 it("keeps the same object for the performance mark", () => {
                     const ref = { ...defaultPerformanceInsight };
@@ -1774,18 +1767,17 @@ describe("DataAccessSingleton", () => {
                 it("does not change start time", () => {
                     const ref = { ...defaultPerformanceInsight };
                     const result = das.stopPerformanceInsight(request, source);
-                    expect(result.httpRequest.startMs).toEqual(ref.httpRequest.startMs);
+                    expect(result.httpRequest!.startMs).toEqual(ref.httpRequest!.startMs);
                 });
                 it("has stop time", () => {
-                    const ref = { ...defaultPerformanceInsight };
                     const result = das.stopPerformanceInsight(request, source);
-                    expect(result.httpRequest.stopMs).toBeDefined();
+                    expect(result.httpRequest!.stopMs).toBeDefined();
                 });
             });
             describe("when source is MemoryCache", () => {
                 beforeEach(() => {
                     source = DataSource.MemoryCache;
-                    request.httpRequest.startMs = 320;
+                    request.httpRequest!.startMs = 320;
                 });
                 it("keeps the same object for the performance mark", () => {
                     const ref = { ...defaultPerformanceInsight };
@@ -1795,18 +1787,17 @@ describe("DataAccessSingleton", () => {
                 it("does not change start time", () => {
                     const ref = { ...defaultPerformanceInsight };
                     const result = das.stopPerformanceInsight(request, source);
-                    expect(result.memoryCache.startMs).toEqual(ref.memoryCache.startMs);
+                    expect(result.memoryCache!.startMs).toEqual(ref.memoryCache!.startMs);
                 });
                 it("has stop time", () => {
-                    const ref = { ...defaultPerformanceInsight };
                     const result = das.stopPerformanceInsight(request, source);
-                    expect(result.memoryCache.stopMs).toBeDefined();
+                    expect(result.memoryCache!.stopMs).toBeDefined();
                 });
             });
             describe("when source is PersistentStorageCache", () => {
                 beforeEach(() => {
                     source = DataSource.PersistentStorageCache;
-                    request.httpRequest.startMs = 420;
+                    request.httpRequest!.startMs = 420;
                 });
                 it("keeps the same object for the performance mark", () => {
                     const ref = { ...defaultPerformanceInsight };
@@ -1816,12 +1807,11 @@ describe("DataAccessSingleton", () => {
                 it("does not change start time", () => {
                     const ref = { ...defaultPerformanceInsight };
                     const result = das.stopPerformanceInsight(request, source);
-                    expect(result.persistentStorageCache.startMs).toEqual(ref.persistentStorageCache.startMs);
+                    expect(result.persistentStorageCache!.startMs).toEqual(ref.persistentStorageCache!.startMs);
                 });
                 it("has stop time", () => {
-                    const ref = { ...defaultPerformanceInsight };
                     const result = das.stopPerformanceInsight(request, source);
-                    expect(result.persistentStorageCache.stopMs).toBeDefined();
+                    expect(result.persistentStorageCache!.stopMs).toBeDefined();
                 });
             });
             describe("when source is System", () => {
@@ -1844,7 +1834,7 @@ describe("DataAccessSingleton", () => {
                 });
                 describe("when alter function is defined", () => {
                     beforeEach(() => {
-                        das.options.alterObjectBeforeHashing = o => {
+                        das.options.alterObjectBeforeHashing = () => {
                             return {
                                 a: 1
                             };
@@ -1885,9 +1875,9 @@ describe("DataAccessSingleton", () => {
         describe("when transaction is successful", () => {
             beforeEach(() => {
                 das.openIndexDb = new DataAccessIndexDbDatabase("testDB");
-                (das.openIndexDb.transaction as any) = (
-                    mode: string,
-                    tables: Dexie.Table<any, any>,
+                (das.openIndexDb!.transaction as any) = (
+                    _mode: string,
+                    _tables: Dexie.Table<any, any>,
                     scope: () => Promise<any>
                 ) => {
                     scope();
@@ -1895,7 +1885,7 @@ describe("DataAccessSingleton", () => {
             });
             describe("when saving the data (put) in indexd successful", () => {
                 beforeEach(() => {
-                    das.openIndexDb.data.put = jest.fn().mockResolvedValue("ok");
+                    das.openIndexDb!.data!.put = jest.fn().mockResolvedValue("ok");
                 });
                 it("returns void", async () => {
                     const result = await das.addInPersistentStore(
@@ -1907,7 +1897,7 @@ describe("DataAccessSingleton", () => {
             });
             describe("when saving the data (put) in indexd fails", () => {
                 beforeEach(() => {
-                    das.openIndexDb.data.put = jest.fn().mockRejectedValue("error");
+                    das.openIndexDb!.data!.put = jest.fn().mockRejectedValue("error");
                     das.logError = jest.fn();
                 });
                 it("throws an exception ", async () => {
@@ -1918,14 +1908,14 @@ describe("DataAccessSingleton", () => {
                     }
                 });
                 it("calls the logerror", async () => {
-                    (das.openIndexDb.transaction as any) = (
-                        mode: string,
-                        tables: Dexie.Table<any, any>,
+                    (das.openIndexDb!.transaction as any) = (
+                        _mode: string,
+                        _tables: Dexie.Table<any, any>,
                         scope: () => Promise<any>
                     ) => {
                         scope();
                     };
-                    das.openIndexDb.data.put = jest.fn().mockRejectedValue("error");
+                    das.openIndexDb!.data!.put = jest.fn().mockRejectedValue("error");
                     try {
                         await das.addInPersistentStore(getMockAjaxRequestInternal("1"), cacheDataExpired);
                     } catch (e) {}
@@ -1935,7 +1925,7 @@ describe("DataAccessSingleton", () => {
         });
         describe("when transaction fails", () => {
             beforeEach(() => {
-                das.openIndexDb.transaction = jest.fn().mockRejectedValue("error");
+                das.openIndexDb!.transaction = jest.fn().mockRejectedValue("error");
             });
             it("throws an exception ", async () => {
                 try {
@@ -1970,11 +1960,11 @@ describe("DataAccessSingleton", () => {
         describe("indexdb defined", () => {
             beforeEach(() => {
                 das.openIndexDb = new DataAccessIndexDbDatabase("testDB");
-                das.openIndexDb.data.get = jest.fn().mockResolvedValue("data_value_1");
+                das.openIndexDb!.data!.get = jest.fn().mockResolvedValue("data_value_1");
             });
             it("get data from the indexdb", async () => {
                 await das.getPersistentStoreData(getMockAjaxRequestInternal("1"));
-                expect(das.openIndexDb.data.get).toHaveBeenCalledTimes(1);
+                expect(das.openIndexDb!.data!.get).toHaveBeenCalledTimes(1);
             });
             it("returns the data from the indexdb", async () => {
                 const result = await das.getPersistentStoreData(getMockAjaxRequestInternal("1"));
@@ -1983,7 +1973,7 @@ describe("DataAccessSingleton", () => {
             describe("it fails getting from the indexdb", () => {
                 beforeEach(() => {
                     das.openIndexDb = new DataAccessIndexDbDatabase("testDB");
-                    das.openIndexDb.data.get = jest.fn().mockRejectedValue("");
+                    das.openIndexDb!.data!.get = jest.fn().mockRejectedValue("");
                     das.logError = jest.fn();
                 });
                 it("calls logerrors", async () => {
@@ -2057,16 +2047,16 @@ describe("DataAccessSingleton", () => {
         describe("indexdb defined", () => {
             beforeEach(() => {
                 das.openIndexDb = new DataAccessIndexDbDatabase("testDB");
-                das.openIndexDb.data.delete = jest.fn().mockResolvedValue("");
+                das.openIndexDb!.data!.delete = jest.fn().mockResolvedValue("");
             });
             it("delete it from the indexdb", async () => {
                 await das.deleteFromPersistentStorage(getMockAjaxRequestInternal("1"));
-                expect(das.openIndexDb.data.delete).toHaveBeenCalledTimes(1);
+                expect(das.openIndexDb!.data!.delete).toHaveBeenCalledTimes(1);
             });
             describe("it fails deleting from the indexdb", () => {
                 beforeEach(() => {
                     das.openIndexDb = new DataAccessIndexDbDatabase("testDB");
-                    das.openIndexDb.data.delete = jest.fn().mockRejectedValue("");
+                    das.openIndexDb!.data!.delete = jest.fn().mockRejectedValue("");
                     das.logError = jest.fn();
                 });
                 it("calls logerrors", async () => {
