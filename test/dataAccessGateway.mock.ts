@@ -1,5 +1,5 @@
 import { AxiosRequestConfig } from "../node_modules/axios";
-import { AjaxRequest, AjaxRequestExecute, AjaxRequestInternal, AjaxRequestWithCache, FetchType, HttpMethod, OnGoingAjaxRequest } from "../src/model";
+import { AjaxRequest, AjaxRequestExecute, AjaxRequestInternal, AjaxRequestWithCache, DataResponse, DataSource, FetchType, HttpMethod, OnGoingAjaxRequest } from "../src/model";
 
 export function getMockAxiosRequestConfig(): AxiosRequestConfig {
     return {
@@ -70,4 +70,12 @@ export function getPromiseRetarder(): PromiseRetarder {
             rejectNow: () => {}
         };
     })();
+}
+
+export function getDataResponse(payload: string): DataResponse<string> {
+    return {
+        result: payload,
+        source: DataSource.HttpRequest,
+        webFetchDateTimeMs: 1000
+    };
 }

@@ -2,7 +2,7 @@ import { AxiosResponse } from "axios";
 import { Dexie } from "dexie";
 import { DataAccessIndexDbDatabase, DataAccessSingleton, DeleteCacheOptions } from "../src/dataAccessGateway";
 import { AjaxRequestInternal, AjaxRequestWithCache, CacheConfiguration, CacheDataWithId, CachedData, DataResponse, DataSource, FetchType, HttpMethod, OnGoingAjaxRequest, PerformanceRequestInsight } from "../src/model";
-import { getMockAjaxRequest, getMockAjaxRequestExecute, getMockAjaxRequestInternal, getMockAjaxRequestWithId, getMockAxiosRequestConfig, getMockOnGoingAjaxRequest, getPromiseRetarder, PromiseRetarder } from "./dataAccessGateway.mock";
+import { getDataResponse, getMockAjaxRequest, getMockAjaxRequestExecute, getMockAjaxRequestInternal, getMockAjaxRequestWithId, getMockAxiosRequestConfig, getMockOnGoingAjaxRequest, getPromiseRetarder, PromiseRetarder } from "./dataAccessGateway.mock";
 const DATABASE_NAME = "Test";
 interface FakeObject {
     id: string;
@@ -12,17 +12,17 @@ const NOW = 1538771480773;
 const cacheDataExpired: CachedData<string> = {
     expirationDateTimeMs: NOW - 10000,
     payload: "Test",
-    dataBirthdateMs: NOW - 20000
+    webFetchDateTimeMs: NOW - 20000
 };
 const cacheDataNotExpired: CachedData<string> = {
     expirationDateTimeMs: NOW + 10000,
     payload: "Test",
-    dataBirthdateMs: NOW - 1
+    webFetchDateTimeMs: NOW - 1
 };
 const dataResponseFromCache: DataResponse<string> = {
     result: "Test",
     source: DataSource.HttpRequest,
-    dataBirthdateMs: NOW
+    webFetchDateTimeMs: NOW
 };
 const defaultPerformanceInsight: PerformanceRequestInsight = {
     fetch: {
@@ -479,7 +479,7 @@ describe("DataAccessSingleton", () => {
                 type = FetchType.Fresh;
                 das.fetchFresh = jest.fn();
             });
-            it("calls the fastFresh", () => {
+            it("calls the fetchFresh", () => {
                 das.fetch(type, request);
                 expect(das.fetchFresh).toHaveBeenCalledTimes(1);
             });
@@ -502,6 +502,16 @@ describe("DataAccessSingleton", () => {
             it("calls the execute", () => {
                 das.fetch(type, request);
                 expect(das.execute).toHaveBeenCalledTimes(1);
+            });
+        });
+        describe("fastAndFresh", () => {
+            beforeEach(() => {
+                type = FetchType.FastAndFresh;
+                das.fetchFastAndFresh = jest.fn();
+            });
+            it("calls the fastAndFresh", () => {
+                das.fetch(type, request);
+                expect(das.fetchFastAndFresh).toHaveBeenCalledTimes(1);
             });
         });
     });
@@ -620,7 +630,7 @@ describe("DataAccessSingleton", () => {
                         expect(result).toEqual({
                             result: "Test",
                             source: DataSource.MemoryCache,
-                            dataBirthdateMs: cacheDataExpired.dataBirthdateMs
+                            webFetchDateTimeMs: cacheDataExpired.webFetchDateTimeMs
                         });
                     });
                 });
@@ -656,7 +666,7 @@ describe("DataAccessSingleton", () => {
                         expect(result).toEqual({
                             result: "Test",
                             source: DataSource.PersistentStorageCache,
-                            dataBirthdateMs: cacheDataExpired.dataBirthdateMs
+                            webFetchDateTimeMs: cacheDataExpired.webFetchDateTimeMs
                         });
                     });
                 });
@@ -747,6 +757,276 @@ describe("DataAccessSingleton", () => {
                 it("NEVER save in cache", async () => {
                     await das.fetchFast(request);
                     await das.fetchFast(request);
+                    expect(das.saveCache).toHaveBeenCalledTimes(0);
+                });
+            });
+        });
+    });
+    describe("fetchFastAndFresh", () => {
+        beforeEach(() => {
+            das.addInPersistentStore = jest.fn().mockRejectedValue("addInPersistentStoreFail");
+            das.getPersistentStoreData = jest.fn().mockRejectedValue("getPersistentStoreDataFail");
+            das.deleteFromPersistentStorage = jest.fn().mockRejectedValue("deleteFromPersistentStorageFail");
+        });
+        let request: AjaxRequestWithCache;
+        beforeEach(() => {
+            request = {
+                request: {
+                    url: "http://request"
+                },
+                memoryCache: { lifespanInSeconds: 1 },
+                persistentCache: { lifespanInSeconds: 1 }
+            };
+        });
+        describe("when cache disabled", () => {
+            beforeEach(() => {
+                das.setConfiguration({ isCacheEnabled: false });
+                das.fetchAndSaveInCacheIfExpired = jest.fn().mockResolvedValue("fromMemory");
+                das.getMemoryStoreData = jest.fn();
+                das.getPersistentStoreData = jest.fn();
+            });
+            it("invokes the HTTP fetch functions", () => {
+                das.fetchFastAndFresh(request);
+                expect(das.fetchAndSaveInCacheIfExpired).toHaveBeenCalledTimes(1);
+            });
+            it("does not invoke Memory cache", () => {
+                das.fetchFastAndFresh(request);
+                expect(das.getMemoryStoreData).toHaveBeenCalledTimes(0);
+            });
+            it("does not invoke Persistent cache", () => {
+                das.fetchFast(request);
+                expect(das.getPersistentStoreData).toHaveBeenCalledTimes(0);
+            });
+            describe("when fetchAndSaveInCacheIfExpired is successful", () => {
+                beforeEach(() => {
+                    das.fetchAndSaveInCacheIfExpired = jest
+                        .fn()
+                        .mockResolvedValue(getDataResponse("fromAjaxFetchCall"));
+                });
+                it("returns the memory", async () => {
+                    const result = await das.fetchFastAndFresh(request);
+                    expect(result.result).toEqual("fromAjaxFetchCall");
+                });
+                it("returns the an undefined webpromise", async () => {
+                    const result = await das.fetchFastAndFresh(request);
+                    expect(result.webPromise).toBeUndefined();
+                });
+            });
+            describe("when fetchAndSaveInCacheIfExpired fails", () => {
+                beforeEach(() => {
+                    das.fetchAndSaveInCacheIfExpired = jest.fn().mockRejectedValue("failFetchAndSaveInCacheIfExpired");
+                    das.stopPerformanceInsight = jest.fn();
+                    das.deletePerformanceInsight = jest.fn();
+                });
+                it("returns a failed promise", async () => {
+                    expect.assertions(1);
+                    try {
+                        await das.fetchFastAndFresh(request);
+                    } catch (e) {
+                        expect(e).toBeDefined();
+                    }
+                });
+                it("has stop the performance collection", async () => {
+                    expect.assertions(1);
+                    try {
+                        await das.fetchFastAndFresh(request);
+                    } catch (e) {
+                        expect(das.stopPerformanceInsight).toHaveBeenCalledTimes(1);
+                    }
+                });
+                it("has deleted the performance collection", async () => {
+                    expect.assertions(1);
+                    try {
+                        await das.fetchFastAndFresh(request);
+                    } catch (e) {
+                        expect(das.deletePerformanceInsight).toHaveBeenCalledTimes(1);
+                    }
+                });
+            });
+        });
+        describe("when cache enabled", () => {
+            beforeEach(() => {
+                das.setConfiguration({ isCacheEnabled: true });
+                das.setDefaultFastCache = jest.fn().mockRejectedValue(request);
+                das.fetchAndSaveInCacheIfExpired = jest.fn().mockResolvedValue(dataResponseFromCache);
+            });
+            it("always set default request id", () => {
+                das.fetchFastAndFresh(request);
+                expect(spySetDefaultRequestId).toHaveBeenCalledTimes(1);
+            });
+            it("always set default fast cache option", () => {
+                das.fetchFastAndFresh(request);
+                expect(das.setDefaultFastCache).toHaveBeenCalledTimes(1);
+            });
+
+            describe("when data in memory cache", () => {
+                beforeEach(() => {
+                    das.getMemoryStoreData = jest.fn().mockReturnValue(cacheDataNotExpired);
+                    das.getPersistentStoreData = jest.fn();
+                });
+                it("tries to fetch from memory cache before persistence", () => {
+                    das.fetchFastAndFresh(request);
+                    expect(das.getMemoryStoreData).toHaveBeenCalledTimes(1);
+                    expect(das.getPersistentStoreData).toHaveBeenCalledTimes(0);
+                });
+                describe("when data in memory cache has expired", () => {
+                    beforeEach(() => {
+                        das.tryMemoryCacheFetching = jest.fn().mockReturnValue(cacheDataExpired);
+                    });
+                    it("invokes fetch", () => {
+                        das.fetchFastAndFresh(request);
+                        expect(das.fetchAndSaveInCacheIfExpired).toHaveBeenCalledTimes(1);
+                    });
+                    it("returns the expired data from the Memory cache", async () => {
+                        const result = await das.fetchFastAndFresh(request);
+                        expect(result).toEqual({
+                            result: "Test",
+                            source: DataSource.MemoryCache,
+                            webFetchDateTimeMs: cacheDataExpired.webFetchDateTimeMs,
+                            webPromise: jest.fn().mockResolvedValue(dataResponseFromCache)()
+                        });
+                    });
+                    it("sets the promise of the fetch in the dual response", async () => {
+                        const result = await das.fetchFastAndFresh(request);
+                        expect(result.webPromise).toBeDefined();
+                    });
+                });
+                describe("when data in memory cache has NOT expired", () => {
+                    beforeEach(() => {
+                        das.getMemoryStoreData = jest.fn().mockReturnValue(cacheDataNotExpired);
+                    });
+                    it("invokes fetch (but won't fetch)", () => {
+                        das.fetchFastAndFresh(request);
+                        expect(das.fetchAndSaveInCacheIfExpired).toHaveBeenCalledTimes(1);
+                    });
+                });
+            });
+            describe("when NO data in memory cache ", () => {
+                beforeEach(() => {
+                    das.getMemoryStoreData = jest.fn().mockReturnValue(undefined);
+                    das.getPersistentStoreData = jest.fn().mockResolvedValue(cacheDataExpired);
+                });
+                it("call the persistent cache", () => {
+                    das.fetchFastAndFresh(request);
+                    expect(das.getPersistentStoreData).toHaveBeenCalledTimes(1);
+                });
+                describe("when data in persistent cache has expired", () => {
+                    beforeEach(() => {
+                        das.getPersistentStoreData = jest.fn().mockResolvedValue(cacheDataExpired);
+                    });
+                    it("invokes fetch", async () => {
+                        await das.fetchFastAndFresh(request);
+                        expect(das.fetchAndSaveInCacheIfExpired).toHaveBeenCalledTimes(1);
+                    });
+                    it("returns the expired data from the Memory cache", async () => {
+                        const result = await das.fetchFastAndFresh(request);
+                        expect(result).toEqual({
+                            result: "Test",
+                            source: DataSource.PersistentStorageCache,
+                            webFetchDateTimeMs: cacheDataExpired.webFetchDateTimeMs,
+                            webPromise: jest.fn().mockResolvedValue(dataResponseFromCache)()
+                        });
+                    });
+                    it("sets the promise of the fetch in the dual response", async () => {
+                        const result = await das.fetchFastAndFresh(request);
+                        expect(result.webPromise).toBeDefined();
+                    });
+                });
+                describe("when data in persistent cache has NOT expired", () => {
+                    beforeEach(() => {
+                        das.getPersistentStoreData = jest.fn().mockResolvedValue(cacheDataNotExpired);
+                        das.addInMemoryCache = jest.fn();
+                    });
+                    it("invokes fetch (but won't fetch)", async () => {
+                        await das.fetchFastAndFresh(request);
+                        expect(das.fetchAndSaveInCacheIfExpired).toHaveBeenCalledTimes(1);
+                    });
+                    it("sets the promise of the fetch in the dual response", async () => {
+                        const result = await das.fetchFastAndFresh(request);
+                        expect(result.webPromise).toBeDefined(); // The promise might contains a Promise.resolve with the Persistent Storage value if not expired ! [P] To work on that. At the moment, require to consumer to check the DataSource to see if HTTP
+                    });
+                    describe("when memory cache enabled", () => {
+                        beforeEach(() => {
+                            request.memoryCache = { lifespanInSeconds: 120 };
+                        });
+                        it("adds in memory", async () => {
+                            await das.fetchFastAndFresh(request);
+                            expect(das.addInMemoryCache).toHaveBeenCalledTimes(1);
+                        });
+                    });
+                    describe("when memory cache is null", () => {
+                        beforeEach(() => {
+                            request.memoryCache = null;
+                        });
+                        it("adds NOT in memory", async () => {
+                            await das.fetchFastAndFresh(request);
+                            expect(das.addInMemoryCache).toHaveBeenCalledTimes(0);
+                        });
+                    });
+                    describe("when memory cache is undefined", () => {
+                        beforeEach(() => {
+                            request.memoryCache = undefined;
+                        });
+                        it("adds NOT in memory", async () => {
+                            await das.fetchFastAndFresh(request);
+                            expect(das.addInMemoryCache).toHaveBeenCalledTimes(0);
+                        });
+                    });
+                });
+                describe("when NO data in persistence cache ", () => {
+                    beforeEach(() => {
+                        das.getPersistentStoreData = jest.fn().mockResolvedValue(undefined);
+                    });
+                    it("invokes fetch", async () => {
+                        await das.fetchFastAndFresh(request);
+                        expect(das.fetchAndSaveInCacheIfExpired).toHaveBeenCalledTimes(1);
+                    });
+                    it("set the dual response with an undefined web promise", async () => {
+                        const result = await das.fetchFastAndFresh(request);
+                        expect(result.webPromise).toBeUndefined();
+                    });
+                    describe("when fetching web fail", () => {
+                        beforeEach(() => {
+                            das.fetchAndSaveInCacheIfExpired = jest
+                                .fn()
+                                .mockRejectedValue("fetchAndSaveInCacheIfExpiredFail");
+                            das.stopPerformanceInsight = jest.fn();
+                            das.deletePerformanceInsight = jest.fn();
+                        });
+                        it("stop collecting performance", async () => {
+                            expect.assertions(1);
+                            try {
+                                await das.fetchFastAndFresh(request);
+                            } catch (e) {
+                                expect(das.stopPerformanceInsight).toHaveBeenCalledTimes(1);
+                            }
+                        });
+                        it("has deleted the performance collection", async () => {
+                            expect.assertions(1);
+                            try {
+                                await das.fetchFastAndFresh(request);
+                            } catch (e) {
+                                expect(das.deletePerformanceInsight).toHaveBeenCalledTimes(1);
+                            }
+                        });
+                    });
+                });
+            });
+
+            describe("when HTTP status 500 followed by a second same call", () => {
+                beforeEach(() => {
+                    das.getMemoryStoreData = jest.fn().mockReturnValue(undefined);
+                    das.getPersistentStoreData = jest.fn().mockResolvedValue(cacheDataExpired);
+                    das.saveCache = jest.fn();
+                });
+                it("calls the Ajax the second call (like the first one)", async () => {
+                    await das.fetchFastAndFresh(request);
+                    await das.fetchFastAndFresh(request);
+                    expect(das.fetchAndSaveInCacheIfExpired).toHaveBeenCalledTimes(2);
+                });
+                it("NEVER save in cache", async () => {
+                    await das.fetchFastAndFresh(request);
+                    await das.fetchFastAndFresh(request);
                     expect(das.saveCache).toHaveBeenCalledTimes(0);
                 });
             });
@@ -1109,7 +1389,7 @@ describe("DataAccessSingleton", () => {
                             contentOfSaveCache = {
                                 result: cacheDataNotExpired.payload,
                                 source: DataSource.MemoryCache,
-                                dataBirthdateMs: cacheDataNotExpired.dataBirthdateMs
+                                webFetchDateTimeMs: cacheDataNotExpired.webFetchDateTimeMs
                             };
                             das.saveCache = jest.fn().mockReturnValue(contentOfSaveCache);
                             das.tryMemoryCacheFetching = jest.fn().mockReturnValue(cacheDataNotExpired);

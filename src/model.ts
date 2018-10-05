@@ -6,7 +6,7 @@ export enum FetchType {
     Fast = "Fast",
     Fresh = "Fresh",
     Web = "Web",
-    FastAndWeb = "FastAndWeb",
+    FastAndFresh = "FastAndWeb",
     Execute = "Execute"
 }
 export enum HttpMethod {
@@ -59,7 +59,7 @@ export interface AjaxRequestInternal extends AjaxRequestWithCache {
 }
 
 export interface CachedData<T> {
-    dataBirthdateMs: number;
+    webFetchDateTimeMs: number;
     expirationDateTimeMs: number;
     payload: T;
 }
@@ -102,7 +102,11 @@ export enum DataAction {
 export interface DataResponse<T extends object | string> {
     source: DataSource;
     result: T;
-    dataBirthdateMs: number;
+    webFetchDateTimeMs: number;
+}
+
+export interface DataDualResponse<T extends object | string> extends DataResponse<T> {
+    webPromise: Promise<DataResponse<T>> | undefined; // Undefined if the expiration defined is not yet passed, undefined if the first response was the WEB
 }
 
 export interface LogBase {
