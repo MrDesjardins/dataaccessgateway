@@ -4,6 +4,7 @@ export enum FetchType {
     Fast = "Fast",
     Fresh = "Fresh",
     Web = "Web",
+    FastAndWeb = "FastAndWeb",
     Execute = "Execute"
 }
 export enum HttpMethod {
@@ -56,7 +57,8 @@ export interface AjaxRequestInternal extends AjaxRequestWithCache {
 }
 
 export interface CachedData<T> {
-    expirationDateTime: Date;
+    dataBirthdateMs: number;
+    expirationDateTimeMs: number;
     payload: T;
 }
 export interface CacheDataWithId<T> extends CachedData<T> {
@@ -98,6 +100,7 @@ export enum DataAction {
 export interface DataResponse<T> {
     source: DataSource;
     result: T;
+    dataBirthdateMs: number;
 }
 
 export interface LogBase {

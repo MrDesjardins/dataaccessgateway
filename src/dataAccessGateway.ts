@@ -170,6 +170,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 return this.fetchWeb(request);
             case FetchType.Execute:
                 return this.execute(request);
+            case FetchType.FastAndWeb:
+                return this.fetchFast(request);
         }
     }
     public async fetchWeb<T>(request: AjaxRequestWithCache): Promise<DataResponse<T>> {
@@ -210,10 +212,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         this.startPerformanceInsight(requestInternal.id, DataSource.MemoryCache); // Performance for memory only
         const memoryCacheValue: CachedData<T> | undefined = this.tryMemoryCacheFetching<T>(requestInternal);
         this.stopPerformanceInsight(requestInternal.id, DataSource.MemoryCache); // Performance for memory only is stopped
-        if (
-            memoryCacheValue !== undefined &&
-            new Date().getTime() <= new Date(memoryCacheValue.expirationDateTime).getTime()
-        ) {
+        const currentDateTimeMs = this.getCurrentDateTimeMs();
+        if (memoryCacheValue !== undefined && currentDateTimeMs <= memoryCacheValue.expirationDateTimeMs) {
             this.stopPerformanceInsight(requestInternal.id); // Stop performance for the whole fetch
             this.logInfo({
                 action: DataAction.Use,
@@ -231,7 +231,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             this.deletePerformanceInsight(requestInternal.id);
             return this.saveCache(requestInternal, {
                 source: DataSource.MemoryCache,
-                result: memoryCacheValue.payload
+                result: memoryCacheValue.payload,
+                dataBirthdateMs: memoryCacheValue.dataBirthdateMs
             });
         }
 
@@ -259,7 +260,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 this.deletePerformanceInsight(requestInternal.id);
                 return this.saveCache(requestInternal, {
                     source: DataSource.PersistentStorageCache,
-                    result: persistentCacheValue.result
+                    result: persistentCacheValue.result,
+                    dataBirthdateMs: persistentCacheValue.dataBirthdateMs
                 });
             }
         } catch (reason) {
@@ -296,7 +298,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             this.deletePerformanceInsight(requestInternal.id);
             return this.saveCache(requestInternal, {
                 source: DataSource.HttpRequest,
-                result: value.data
+                result: value.data,
+                dataBirthdateMs: this.getCurrentDateTimeMs()
             });
         } catch (reason) {
             this.stopPerformanceInsight(requestInternal.id);
@@ -443,7 +446,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 this.deletePerformanceInsight(requestInternal.id);
                 return Promise.resolve({
                     source: DataSource.PersistentStorageCache,
-                    result: persistentStorageEntry.payload
+                    result: persistentStorageEntry.payload,
+                    dataBirthdateMs: persistentStorageEntry.dataBirthdateMs
                 });
             }
         } else {
@@ -470,7 +474,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             this.deletePerformanceInsight(requestInternal.id);
             return Promise.resolve({
                 source: DataSource.MemoryCache,
-                result: memoryCacheEntry.payload
+                result: memoryCacheEntry.payload,
+                dataBirthdateMs: memoryCacheEntry.dataBirthdateMs
             });
         }
     }
@@ -481,7 +486,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         cacheEntry?: CachedData<T> | undefined
     ): Promise<DataResponse<T>> {
         const ERROR_HANDLED_MSG = "Cannot cache request that are not in the range of 200 or in the range of 300.";
-        if (cacheEntry === undefined || new Date().getTime() > new Date(cacheEntry.expirationDateTime).getTime()) {
+        if (cacheEntry === undefined || this.getCurrentDateTimeMs() > cacheEntry.expirationDateTimeMs) {
             try {
                 this.startPerformanceInsight(requestInternal.id, DataSource.HttpRequest);
                 const value: AxiosResponse<T> = await this.fetchWithAjax<T>(requestInternal);
@@ -499,7 +504,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                     });
                     return this.saveCache(requestInternal, {
                         source: DataSource.HttpRequest,
-                        result: value.data
+                        result: value.data,
+                        dataBirthdateMs: this.getCurrentDateTimeMs()
                     });
                 } else {
                     this.options.onBackgroundAjaxFetchFailure(value);
@@ -526,7 +532,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         } else {
             return Promise.resolve({
                 source: source, // This might be from the persistent storage as well
-                result: cacheEntry.payload
+                result: cacheEntry.payload,
+                dataBirthdateMs: cacheEntry.dataBirthdateMs
             });
         }
     }
@@ -575,12 +582,13 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             this.addInMemoryCache(requestInternal, responseFromCacheOrAjax.result);
         }
         if (requestInternal.persistentCache !== undefined && requestInternal.persistentCache !== null) {
-            const currentUTCDataWithLifeSpanAdded = new Date(
-                new Date().getTime() + requestInternal.persistentCache.lifespanInSeconds * 1000
-            );
+            const expiredDateTimeMs =
+                responseFromCacheOrAjax.dataBirthdateMs + requestInternal.persistentCache.lifespanInSeconds * 1000;
+
             const cachedData: CachedData<T> = {
-                expirationDateTime: currentUTCDataWithLifeSpanAdded,
-                payload: responseFromCacheOrAjax.result
+                expirationDateTimeMs: expiredDateTimeMs,
+                payload: responseFromCacheOrAjax.result,
+                dataBirthdateMs: responseFromCacheOrAjax.dataBirthdateMs
             };
             this.addInPersistentStore(requestInternal, cachedData);
         }
@@ -598,7 +606,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         const cacheEntry: CachedData<T> | undefined = this.getMemoryStoreData(requestInternal);
         if (cacheEntry !== undefined) {
             // If expired, fetch
-            if (new Date().getTime() > new Date(cacheEntry.expirationDateTime).getTime()) {
+            if (this.getCurrentDateTimeMs() > cacheEntry.expirationDateTimeMs) {
                 // Delete from cache
                 this.deleteFromMemoryCache(requestInternal);
             }
@@ -623,7 +631,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             const persistentStorageValue = await this.getPersistentStoreData<T>(requestInternal);
             if (persistentStorageValue !== undefined) {
                 const localStorageCacheEntry = persistentStorageValue;
-                if (new Date().getTime() > new Date(localStorageCacheEntry.expirationDateTime).getTime()) {
+                if (this.getCurrentDateTimeMs() > localStorageCacheEntry.expirationDateTimeMs) {
                     this.deleteFromPersistentStorage(requestInternal);
                 } else {
                     this.logInfo({
@@ -641,7 +649,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                     });
                     return {
                         source: DataSource.PersistentStorageCache,
-                        result: localStorageCacheEntry.payload
+                        result: localStorageCacheEntry.payload,
+                        dataBirthdateMs: localStorageCacheEntry.dataBirthdateMs
                     };
                 }
             }
@@ -860,14 +869,14 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         const id = requestInternal.id;
         const url = requestInternal.request.url!;
         const lifespanInSeconds = requestInternal.memoryCache!.lifespanInSeconds;
-        const currentUTCDataWithLifeSpanAdded = new Date(new Date().getTime() + lifespanInSeconds * 1000);
-        this.cachedResponse.set(
-            id,
-            JSON.stringify({
-                expirationDateTime: currentUTCDataWithLifeSpanAdded,
-                payload: dataToAdd
-            })
-        );
+        const currentDateTimeMs = this.getCurrentDateTimeMs()
+        const currentUTCDataWithLifeSpanAdded = currentDateTimeMs + lifespanInSeconds * 1000;
+        const cacheData: CachedData<T> = {
+            expirationDateTimeMs: currentUTCDataWithLifeSpanAdded,
+            payload: dataToAdd,
+            dataBirthdateMs: currentDateTimeMs
+        };
+        this.cachedResponse.set(id, JSON.stringify(cacheData));
         this.logInfo({
             id: id,
             url: url,
@@ -1117,7 +1126,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             this.invalidateRequests(request);
             return {
                 source: DataSource.HttpRequest,
-                result: response.data
+                result: response.data,
+                dataBirthdateMs: this.getCurrentDateTimeMs()
             };
         } catch (error) {
             this.stopPerformanceInsight(requestInternal.id, DataSource.HttpRequest);
@@ -1165,6 +1175,10 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             hash = hash & hash; // Convert to 32bit integer
         }
         return hash.toString();
+    }
+
+    public getCurrentDateTimeMs(): number {
+        return this.getCurrentDateTimeMs()
     }
 }
 const DataAccessGateway: (databaseName: string) => IDataAccessSingleton = (databaseName: string = "DatabaseName") =>

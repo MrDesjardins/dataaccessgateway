@@ -8,17 +8,21 @@ interface FakeObject {
     id: string;
     name: string;
 }
+const NOW = 1538771480773;
 const cacheDataExpired: CachedData<string> = {
-    expirationDateTime: new Date(new Date().getTime() - 10000),
-    payload: "Test"
+    expirationDateTimeMs: NOW - 10000,
+    payload: "Test",
+    dataBirthdateMs: NOW - 20000
 };
 const cacheDataNotExpired: CachedData<string> = {
-    expirationDateTime: new Date(new Date().getTime() + 10000),
-    payload: "Test"
+    expirationDateTimeMs: NOW + 10000,
+    payload: "Test",
+    dataBirthdateMs: NOW - 1
 };
 const dataResponseFromCache: DataResponse<string> = {
     result: "Test",
-    source: DataSource.HttpRequest
+    source: DataSource.HttpRequest,
+    dataBirthdateMs: NOW
 };
 const defaultPerformanceInsight: PerformanceRequestInsight = {
     fetch: {
@@ -85,6 +89,7 @@ describe("DataAccessSingleton", () => {
             config: {},
             headers: {}
         };
+        das.getCurrentDateTimeMs = jest.fn().mockReturnValue(NOW);
     });
     afterEach(() => {
         spySetDefaultRequestId.mockRestore();
@@ -534,12 +539,11 @@ describe("DataAccessSingleton", () => {
             });
             describe("when fetchAndSaveInCacheIfExpired is successful", () => {
                 beforeEach(() => {
-                    das.fetchAndSaveInCacheIfExpired = jest.fn().mockResolvedValue("fromMemory");
+                    das.fetchAndSaveInCacheIfExpired = jest.fn().mockResolvedValue("fromAjaxFetchCall");
                 });
                 it("returns the memory", async () => {
                     const result = await das.fetchFast(request);
-                    expect(result).toEqual("fromMemory");
-                    expect(result).toEqual("fromMemory");
+                    expect(result).toEqual("fromAjaxFetchCall");
                 });
             });
             describe("when fetchAndSaveInCacheIfExpired fails", () => {
@@ -609,7 +613,11 @@ describe("DataAccessSingleton", () => {
                     });
                     it("returns the expired data from the Memory cache", async () => {
                         const result = await das.fetchFast(request);
-                        expect(result).toEqual({ result: "Test", source: DataSource.MemoryCache });
+                        expect(result).toEqual({
+                            result: "Test",
+                            source: DataSource.MemoryCache,
+                            dataBirthdateMs: cacheDataExpired.dataBirthdateMs
+                        });
                     });
                 });
                 describe("when data in memory cache has NOT expired", () => {
@@ -641,7 +649,11 @@ describe("DataAccessSingleton", () => {
                     });
                     it("returns the expired data from the Memory cache", async () => {
                         const result = await das.fetchFast(request);
-                        expect(result).toEqual({ result: "Test", source: DataSource.PersistentStorageCache });
+                        expect(result).toEqual({
+                            result: "Test",
+                            source: DataSource.PersistentStorageCache,
+                            dataBirthdateMs: cacheDataExpired.dataBirthdateMs
+                        });
                     });
                 });
                 describe("when data in persistent cache has NOT expired", () => {
@@ -878,10 +890,7 @@ describe("DataAccessSingleton", () => {
     describe("saveCache", () => {
         let response: DataResponse<string>;
         beforeEach(() => {
-            response = {
-                result: "Test",
-                source: DataSource.HttpRequest
-            };
+            response = dataResponseFromCache;
             das.options.isCacheMandatoryIfEnabled = true;
             das.addInMemoryCache = jest.fn();
             das.addInPersistentStore = jest.fn().mockResolvedValue("test");
@@ -1093,7 +1102,11 @@ describe("DataAccessSingleton", () => {
                     describe("when value is not expired", () => {
                         let contentOfSaveCache: DataResponse<string>;
                         beforeEach(() => {
-                            contentOfSaveCache = { result: cacheDataNotExpired.payload, source: DataSource.MemoryCache };
+                            contentOfSaveCache = {
+                                result: cacheDataNotExpired.payload,
+                                source: DataSource.MemoryCache,
+                                dataBirthdateMs: cacheDataNotExpired.dataBirthdateMs
+                            };
                             das.saveCache = jest.fn().mockReturnValue(contentOfSaveCache);
                             das.tryMemoryCacheFetching = jest.fn().mockReturnValue(cacheDataNotExpired);
                             das.tryPersistentStorageFetching = jest.fn();
@@ -1115,7 +1128,11 @@ describe("DataAccessSingleton", () => {
                         let contentOfSaveCache: DataResponse<string>;
                         beforeEach(() => {
                             das.tryMemoryCacheFetching = jest.fn().mockResolvedValue(cacheDataExpired);
-                            contentOfSaveCache = { result: cacheDataNotExpired.payload, source: DataSource.MemoryCache };
+                            contentOfSaveCache = {
+                                result: cacheDataNotExpired.payload,
+                                source: DataSource.MemoryCache,
+                                dataBirthdateMs: cacheDataExpired.dataBirthdateMs
+                            };
                             das.tryPersistentStorageFetching = jest.fn();
                         });
                         it("calls call tryPersistentStorageFetching", async () => {
