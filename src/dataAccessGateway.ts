@@ -1363,7 +1363,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
     }
 
     public getCurrentDateTimeMs(): number {
-        return this.getCurrentDateTimeMs();
+        return new Date().valueOf();
     }
 }
 const DataAccessGateway: (databaseName: string) => IDataAccessSingleton = (databaseName: string = "DatabaseName") =>
