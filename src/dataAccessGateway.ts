@@ -195,7 +195,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 performanceInsight: this.setDataSize(this.getPerformanceInsight(requestInternal.id), response.result),
                 dataSignature: this.writeSignature(response.result),
                 fetchType: requestInternal.fetchType,
-                httpMethod: requestInternal.httpMethod
+                httpMethod: requestInternal.httpMethod,
+                dataAgeMs: this.getCurrentDateTimeMs() - response.webFetchDateTimeMs
             });
             this.deletePerformanceInsight(requestInternal.id);
             return response;
@@ -230,7 +231,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 ),
                 dataSignature: this.writeSignature(memoryCacheValue.payload),
                 fetchType: requestInternal.fetchType,
-                httpMethod: requestInternal.httpMethod
+                httpMethod: requestInternal.httpMethod,
+                dataAgeMs: this.getCurrentDateTimeMs() - memoryCacheValue.webFetchDateTimeMs
             });
             this.deletePerformanceInsight(requestInternal.id);
             return this.saveCache(requestInternal, {
@@ -259,7 +261,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                     ),
                     dataSignature: this.writeSignature(persistentCacheValue.result),
                     fetchType: requestInternal.fetchType,
-                    httpMethod: requestInternal.httpMethod
+                    httpMethod: requestInternal.httpMethod,
+                    dataAgeMs: this.getCurrentDateTimeMs() - persistentCacheValue.webFetchDateTimeMs
                 });
                 this.deletePerformanceInsight(requestInternal.id);
                 return this.saveCache(requestInternal, {
@@ -297,7 +300,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 performanceInsight: this.setDataSize(this.getPerformanceInsight(requestInternal.id), value.data),
                 dataSignature: this.writeSignature(value.data),
                 fetchType: requestInternal.fetchType,
-                httpMethod: requestInternal.httpMethod
+                httpMethod: requestInternal.httpMethod,
+                dataAgeMs: 0
             });
             this.deletePerformanceInsight(requestInternal.id);
             return this.saveCache(requestInternal, {
@@ -353,7 +357,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                     ),
                     dataSignature: this.writeSignature(response.result),
                     fetchType: requestInternal.fetchType,
-                    httpMethod: requestInternal.httpMethod
+                    httpMethod: requestInternal.httpMethod,
+                    dataAgeMs: this.getCurrentDateTimeMs() - response.webFetchDateTimeMs
                 });
                 this.deletePerformanceInsight(requestInternal.id);
                 return response;
@@ -406,7 +411,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                         ),
                         dataSignature: this.writeSignature(response.result),
                         fetchType: requestInternal.fetchType,
-                        httpMethod: requestInternal.httpMethod
+                        httpMethod: requestInternal.httpMethod,
+                        dataAgeMs: this.getCurrentDateTimeMs() - response.webFetchDateTimeMs
                     });
                     this.deletePerformanceInsight(requestInternal.id);
                     return response;
@@ -445,7 +451,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                     ),
                     dataSignature: this.writeSignature(persistentStorageEntry.payload),
                     fetchType: requestInternal.fetchType,
-                    httpMethod: requestInternal.httpMethod
+                    httpMethod: requestInternal.httpMethod,
+                    dataAgeMs: this.getCurrentDateTimeMs() - persistentStorageEntry.webFetchDateTimeMs
                 });
                 this.deletePerformanceInsight(requestInternal.id);
                 return Promise.resolve({
@@ -473,7 +480,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 ),
                 dataSignature: this.writeSignature(memoryCacheEntry.payload),
                 fetchType: requestInternal.fetchType,
-                httpMethod: requestInternal.httpMethod
+                httpMethod: requestInternal.httpMethod,
+                dataAgeMs: this.getCurrentDateTimeMs() - memoryCacheEntry.webFetchDateTimeMs
             });
             this.deletePerformanceInsight(requestInternal.id);
             return Promise.resolve({
@@ -508,7 +516,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                     ),
                     dataSignature: this.writeSignature(response.result),
                     fetchType: requestInternal.fetchType,
-                    httpMethod: requestInternal.httpMethod
+                    httpMethod: requestInternal.httpMethod,
+                    dataAgeMs: this.getCurrentDateTimeMs() - response.webFetchDateTimeMs
                 });
                 this.deletePerformanceInsight(requestInternal.id);
                 return {
@@ -564,7 +573,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                         ),
                         dataSignature: this.writeSignature(response.result),
                         fetchType: requestInternal.fetchType,
-                        httpMethod: requestInternal.httpMethod
+                        httpMethod: requestInternal.httpMethod,
+                        dataAgeMs: this.getCurrentDateTimeMs() - response.webFetchDateTimeMs
                     });
                     this.deletePerformanceInsight(requestInternal.id);
                     return {
@@ -603,7 +613,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                     ),
                     dataSignature: this.writeSignature(persistentStorageEntry.payload),
                     fetchType: requestInternal.fetchType,
-                    httpMethod: requestInternal.httpMethod
+                    httpMethod: requestInternal.httpMethod,
+                    dataAgeMs: this.getCurrentDateTimeMs() - persistentStorageEntry.webFetchDateTimeMs
                 });
                 this.deletePerformanceInsight(requestInternal.id);
                 const responseDual: DataDualResponse<T> = {
@@ -634,7 +645,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 ),
                 dataSignature: this.writeSignature(memoryCacheEntry.payload),
                 fetchType: requestInternal.fetchType,
-                httpMethod: requestInternal.httpMethod
+                httpMethod: requestInternal.httpMethod,
+                dataAgeMs: this.getCurrentDateTimeMs() - memoryCacheEntry.webFetchDateTimeMs
             });
             this.deletePerformanceInsight(requestInternal.id);
             const responseDual: DataDualResponse<T> = {
@@ -684,7 +696,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                             performanceInsight: this.getPerformanceInsight(requestInternal.id),
                             dataSignature: this.writeSignature(value.data),
                             fetchType: requestInternal.fetchType,
-                            httpMethod: requestInternal.httpMethod
+                            httpMethod: requestInternal.httpMethod,
+                            dataAgeMs: 0
                         });
                         return this.saveCache(requestInternal, {
                             source: DataSource.HttpRequest,
@@ -830,7 +843,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                         ),
                         dataSignature: this.writeSignature(localStorageCacheEntry.payload),
                         fetchType: requestInternal.fetchType,
-                        httpMethod: requestInternal.httpMethod
+                        httpMethod: requestInternal.httpMethod,
+                        dataAgeMs: this.getCurrentDateTimeMs() - localStorageCacheEntry.webFetchDateTimeMs
                     });
                     return {
                         source: DataSource.PersistentStorageCache,
@@ -886,7 +900,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 performanceInsight: this.getPerformanceInsight(requestInternal.id),
                 dataSignature: undefined,
                 fetchType: requestInternal.fetchType,
-                httpMethod: requestInternal.httpMethod
+                httpMethod: requestInternal.httpMethod,
+                dataAgeMs: undefined
             });
             return cacheOnGoingEntry.promise;
         }
@@ -1012,7 +1027,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             performanceInsight: this.getPerformanceInsight(id),
             dataSignature: undefined,
             fetchType: requestInternal.fetchType,
-            httpMethod: requestInternal.httpMethod
+            httpMethod: requestInternal.httpMethod,
+            dataAgeMs: undefined
         });
         this.cachedResponse.delete(id);
     }
@@ -1029,7 +1045,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             performanceInsight: this.getPerformanceInsight(requestInternal.id),
             dataSignature: undefined,
             fetchType: requestInternal.fetchType,
-            httpMethod: requestInternal.httpMethod
+            httpMethod: requestInternal.httpMethod,
+            dataAgeMs: undefined
         });
         this.onGoingAjaxRequest.set(requestInternal.id, {
             ajaxRequest: requestInternal,
@@ -1045,7 +1062,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             performanceInsight: this.getPerformanceInsight(requestInternal.id),
             dataSignature: undefined,
             fetchType: requestInternal.fetchType,
-            httpMethod: requestInternal.httpMethod
+            httpMethod: requestInternal.httpMethod,
+            dataAgeMs: undefined
         });
         this.onGoingAjaxRequest.delete(requestInternal.id);
     }
@@ -1070,7 +1088,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             performanceInsight: this.getPerformanceInsight(id),
             dataSignature: this.writeSignature(dataToAdd),
             fetchType: requestInternal.fetchType,
-            httpMethod: requestInternal.httpMethod
+            httpMethod: requestInternal.httpMethod,
+            dataAgeMs: undefined
         });
     }
 
@@ -1099,7 +1118,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                             performanceInsight: this.getPerformanceInsight(id),
                             dataSignature: this.writeSignature(cacheData.payload),
                             fetchType: requestInternal.fetchType,
-                            httpMethod: requestInternal.httpMethod
+                            httpMethod: requestInternal.httpMethod,
+                            dataAgeMs: undefined
                         });
                         return;
                     } catch (e) {
@@ -1148,20 +1168,25 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         this.startPerformanceInsight(id, DataSource.MemoryCache);
         const cacheValue = this.cachedResponse.get(id);
         this.stopPerformanceInsight(id, DataSource.MemoryCache);
-        this.logInfo({
+        const logInfoData: LogInfo = {
+            kind: "LogInfo",
             action: DataAction.Fetch,
             id: id,
             url: url,
             source: DataSource.MemoryCache,
             performanceInsight: this.getPerformanceInsight(id),
-            dataSignature: this.writeSignature(cacheValue === undefined ? "" : JSON.parse(cacheValue)),
+            dataSignature: this.writeSignature(cacheValue === undefined ? undefined : JSON.parse(cacheValue)),
             fetchType: requestInternal.fetchType,
-            httpMethod: requestInternal.httpMethod
-        });
+            httpMethod: requestInternal.httpMethod,
+            dataAgeMs: undefined // Redefined below
+        };
         if (cacheValue === undefined) {
+            this.logInfo({ ...logInfoData, dataAgeMs: undefined });
             return undefined;
         }
-        return JSON.parse(cacheValue) as CachedData<T>;
+        const parsedCacheValue = JSON.parse(cacheValue) as CachedData<T>;
+        this.logInfo({ ...logInfoData, dataAgeMs: this.getCurrentDateTimeMs() - parsedCacheValue.webFetchDateTimeMs });
+        return parsedCacheValue;
     }
     public async getPersistentStoreData<T>(
         requestInternal: AjaxRequestInternal
@@ -1181,9 +1206,13 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 url: url,
                 source: DataSource.PersistentStorageCache,
                 performanceInsight: this.getPerformanceInsight(id),
-                dataSignature: this.writeSignature(resultPromise === undefined ? "" : resultPromise.payload),
+                dataSignature: this.writeSignature(resultPromise === undefined ? undefined : resultPromise.payload),
                 fetchType: requestInternal.fetchType,
-                httpMethod: requestInternal.httpMethod
+                httpMethod: requestInternal.httpMethod,
+                dataAgeMs:
+                    resultPromise === undefined
+                        ? undefined
+                        : this.getCurrentDateTimeMs() - resultPromise.webFetchDateTimeMs
             });
             return resultPromise;
         } catch (reason) {
@@ -1219,7 +1248,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 performanceInsight: this.getPerformanceInsight(id),
                 dataSignature: undefined,
                 fetchType: requestInternal.fetchType,
-                httpMethod: requestInternal.httpMethod
+                httpMethod: requestInternal.httpMethod,
+                dataAgeMs: undefined
             });
             return deleted;
         } catch (reason) {
@@ -1305,7 +1335,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 performanceInsight: this.setDataSize(this.getPerformanceInsight(requestInternal.id), response.data),
                 dataSignature: this.writeSignature(response.data),
                 fetchType: requestInternal.fetchType,
-                httpMethod: requestInternal.httpMethod
+                httpMethod: requestInternal.httpMethod,
+                dataAgeMs: 0
             });
             this.deletePerformanceInsight(requestInternal.id);
             this.invalidateRequests(request);

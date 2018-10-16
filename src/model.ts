@@ -56,6 +56,7 @@ export interface AjaxRequestInternal extends AjaxRequestWithCache {
     id: string;
     fetchType: FetchType | undefined;
     httpMethod: HttpMethod;
+    // fetchCompleted: boolean | undefined;
 }
 
 export interface CachedData<T> {
@@ -125,4 +126,6 @@ export interface LogError extends LogBase {
 export interface LogInfo extends LogBase {
     kind: "LogInfo";
     dataSignature: string | undefined;
+    dataAgeMs: number | undefined;
+    // fetchCompleted: boolean;
 }
