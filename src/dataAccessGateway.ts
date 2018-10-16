@@ -600,6 +600,24 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                     persistentStorageEntry
                 );
 
+                if(this.isPromise(responseWeb)){
+                    responseWeb.then( (dataResponse: DataResponse<T>)=>{
+                        this.logInfo({
+                            action: DataAction.Use,
+                            id: requestInternal.id,
+                            url: requestInternal.request.url!,
+                            source: dataResponse.source,
+                            performanceInsight: this.setDataSize(
+                                this.getPerformanceInsight(requestInternal.id),
+                                dataResponse.result
+                            ),
+                            dataSignature: this.writeSignature(dataResponse.result),
+                            fetchType: requestInternal.fetchType,
+                            httpMethod: requestInternal.httpMethod,
+                            dataAgeMs: 0
+                        });
+                    });
+                }
                 // Return the persistent storage even if expired
                 this.stopPerformanceInsight(requestInternal.id);
                 this.logInfo({
@@ -632,6 +650,24 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 memoryCacheEntry
             ); // We have something in the memory, but we might still want to fetch if expire for future requests
 
+            if(this.isPromise(responseWeb)){
+                responseWeb.then( (dataResponse: DataResponse<T>)=>{
+                    this.logInfo({
+                        action: DataAction.Use,
+                        id: requestInternal.id,
+                        url: requestInternal.request.url!,
+                        source: dataResponse.source,
+                        performanceInsight: this.setDataSize(
+                            this.getPerformanceInsight(requestInternal.id),
+                            dataResponse.result
+                        ),
+                        dataSignature: this.writeSignature(dataResponse.result),
+                        fetchType: requestInternal.fetchType,
+                        httpMethod: requestInternal.httpMethod,
+                        dataAgeMs: 0
+                    });
+                });
+            }
             this.stopPerformanceInsight(requestInternal.id, DataSource.MemoryCache);
             this.stopPerformanceInsight(requestInternal.id);
             this.logInfo({
