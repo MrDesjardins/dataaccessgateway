@@ -293,6 +293,16 @@ If you change your model structure, you may want to flush everything and start f
 ``` 
 DataAccessGateway("AppName").deletePersistentStorage("AppName");
 ``` 
+## DeleteAllDataFromAllCache
+
+### What
+
+Clear all data in the memory cache and clear all the persisten storage (without deleting the IndexDb)
+
+### When
+
+If you want to have a button allowing your users to manually flush the cache. Often, a button in deep in the user's preference is suggested when debugging your application. It is easier to tell a user to flush the cache then doing multiple steps. Flushing the cache is always a good
+step when debugging inconsistent data.
 
 # On-going HTTP Request
 

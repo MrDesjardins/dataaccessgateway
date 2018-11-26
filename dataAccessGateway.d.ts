@@ -28,6 +28,7 @@ export interface IDataAccessSingleton {
     fetchWeb<T extends CachedType>(request: AjaxRequestWithCache): Promise<DataResponse<T>>;
     fetchFastAndFresh<T extends CachedType>(request: AjaxRequestWithCache): Promise<DataDualResponse<T>>;
     deleteDataFromCache(request: AjaxRequest, options?: DeleteCacheOptions): Promise<void>;
+    deleteAllDataFromAllCache(): Promise<void>;
     deletePersistentStorage(name: string): Promise<void>;
     forceDeleteAndFetch<T extends CachedType>(request: AjaxRequestWithCache, options?: DeleteCacheOptions): Promise<DataResponse<T>>;
     execute<T extends CachedType>(request: AjaxRequestExecute): Promise<DataResponse<T>>;
@@ -112,6 +113,7 @@ export declare class DataAccessSingleton implements IDataAccessSingleton {
     deleteFromPersistentStorage(requestInternal: AjaxRequestInternal): Promise<void>;
     forceDeleteAndFetch<T extends CachedType>(request: AjaxRequestWithCache, options?: DeleteCacheOptions): Promise<DataResponse<T>>;
     deleteDataFromCache(request: AjaxRequest, options?: DeleteCacheOptions): Promise<void>;
+    deleteAllDataFromAllCache(): Promise<void>;
     deletePersistentStorage(name: string): Promise<void>;
     writeSignature<T extends CachedType>(payload: T): string;
     execute<T extends CachedType>(request: AjaxRequestExecute): Promise<DataResponse<T>>;

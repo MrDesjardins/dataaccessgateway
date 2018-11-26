@@ -41,6 +41,7 @@ export interface IDataAccessSingleton {
     fetchWeb<T extends CachedType>(request: AjaxRequestWithCache): Promise<DataResponse<T>>;
     fetchFastAndFresh<T extends CachedType>(request: AjaxRequestWithCache): Promise<DataDualResponse<T>>;
     deleteDataFromCache(request: AjaxRequest, options?: DeleteCacheOptions): Promise<void>;
+    deleteAllDataFromAllCache(): Promise<void>;
     deletePersistentStorage(name: string): Promise<void>;
     forceDeleteAndFetch<T extends CachedType>(
         request: AjaxRequestWithCache,
@@ -517,7 +518,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                     dataSignature: this.writeSignature(response.result),
                     fetchType: requestInternal.fetchType,
                     httpMethod: requestInternal.httpMethod,
-                    dataAgeMs: this.getCurrentDateTimeMs() - response.webFetchDateTimeMs
+                    dataAgeMs: this.getCurrentDateTimeMs() - response.webFetchDateTimeMs,
+                    useIsIntermediate: false
                 });
                 this.deletePerformanceInsight(requestInternal.id);
                 return {
@@ -574,7 +576,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                         dataSignature: this.writeSignature(response.result),
                         fetchType: requestInternal.fetchType,
                         httpMethod: requestInternal.httpMethod,
-                        dataAgeMs: this.getCurrentDateTimeMs() - response.webFetchDateTimeMs
+                        dataAgeMs: this.getCurrentDateTimeMs() - response.webFetchDateTimeMs,
+                        useIsIntermediate: false
                     });
                     this.deletePerformanceInsight(requestInternal.id);
                     return {
@@ -600,8 +603,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                     persistentStorageEntry
                 );
 
-                if(this.isPromise(responseWeb)){
-                    responseWeb.then( (dataResponse: DataResponse<T>)=>{
+                if (this.isPromise(responseWeb)) {
+                    responseWeb.then((dataResponse: DataResponse<T>) => {
                         this.logInfo({
                             action: DataAction.Use,
                             id: requestInternal.id,
@@ -614,7 +617,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                             dataSignature: this.writeSignature(dataResponse.result),
                             fetchType: requestInternal.fetchType,
                             httpMethod: requestInternal.httpMethod,
-                            dataAgeMs: 0
+                            dataAgeMs: 0,
+                            useIsIntermediate: false
                         });
                     });
                 }
@@ -632,7 +636,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                     dataSignature: this.writeSignature(persistentStorageEntry.payload),
                     fetchType: requestInternal.fetchType,
                     httpMethod: requestInternal.httpMethod,
-                    dataAgeMs: this.getCurrentDateTimeMs() - persistentStorageEntry.webFetchDateTimeMs
+                    dataAgeMs: this.getCurrentDateTimeMs() - persistentStorageEntry.webFetchDateTimeMs,
+                    useIsIntermediate: true
                 });
                 this.deletePerformanceInsight(requestInternal.id);
                 const responseDual: DataDualResponse<T> = {
@@ -650,8 +655,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 memoryCacheEntry
             ); // We have something in the memory, but we might still want to fetch if expire for future requests
 
-            if(this.isPromise(responseWeb)){
-                responseWeb.then( (dataResponse: DataResponse<T>)=>{
+            if (this.isPromise(responseWeb)) {
+                responseWeb.then((dataResponse: DataResponse<T>) => {
                     this.logInfo({
                         action: DataAction.Use,
                         id: requestInternal.id,
@@ -664,7 +669,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                         dataSignature: this.writeSignature(dataResponse.result),
                         fetchType: requestInternal.fetchType,
                         httpMethod: requestInternal.httpMethod,
-                        dataAgeMs: 0
+                        dataAgeMs: 0,
+                        useIsIntermediate: false
                     });
                 });
             }
@@ -682,7 +688,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 dataSignature: this.writeSignature(memoryCacheEntry.payload),
                 fetchType: requestInternal.fetchType,
                 httpMethod: requestInternal.httpMethod,
-                dataAgeMs: this.getCurrentDateTimeMs() - memoryCacheEntry.webFetchDateTimeMs
+                dataAgeMs: this.getCurrentDateTimeMs() - memoryCacheEntry.webFetchDateTimeMs,
+                useIsIntermediate: true
             });
             this.deletePerformanceInsight(requestInternal.id);
             const responseDual: DataDualResponse<T> = {
@@ -1326,6 +1333,21 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 promise = Promise.resolve();
             }
             return promise;
+        }
+    }
+    public deleteAllDataFromAllCache(): Promise<void> {
+        // 1) Delete from the memory cache
+        this.cachedResponse.clear();
+
+        // 2) Delete from the persistent storage (IndexDb)
+        if (this.openIndexDb !== undefined) {
+            let promises: Promise<void>[] = [];
+            this.openIndexDb.tables.forEach(dexieTable => promises.push(dexieTable.clear()));
+            return Promise.all(promises).then(() => {
+                return;
+            });
+        } else {
+            return Promise.resolve();
         }
     }
     public async deletePersistentStorage(name: string): Promise<void> {

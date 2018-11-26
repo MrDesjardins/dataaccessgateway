@@ -1697,6 +1697,34 @@ describe("DataAccessSingleton", () => {
             });
         });
     });
+    describe("deleteAllDataFromAllCache", () => {
+        beforeEach(() => {
+            das.cachedResponse.clear = jest.fn();
+        });
+        describe("when NO indexDb", () => {
+            beforeEach(() => {
+                das.openIndexDb = undefined;
+            });
+            it("flushes memory cache", () => {
+                das.deleteAllDataFromAllCache();
+                expect(das.cachedResponse.clear).toHaveBeenCalledTimes(1);
+            });
+        });
+        describe("when indexDb", () => {
+            beforeEach(() => { 
+                das.openIndexDb = new DataAccessIndexDbDatabase("testDB");
+                das.openIndexDb.tables[0].clear = jest.fn();
+            });
+            it("flushes memory cache", () => {
+                das.deleteAllDataFromAllCache();
+                expect(das.cachedResponse.clear).toHaveBeenCalledTimes(1);
+            });
+            it("does flushes indexdb", () => {
+                das.deleteAllDataFromAllCache();
+                expect(das.openIndexDb!.tables[0].clear).toHaveBeenCalledTimes(1);
+            });
+        });
+    });
     describe("addInMemoryCache", () => {
         let requestWithId: AjaxRequestInternal;
         beforeEach(() => {

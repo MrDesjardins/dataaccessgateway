@@ -126,4 +126,11 @@ export interface LogInfo extends LogBase {
     kind: "LogInfo";
     dataSignature: string | undefined;
     dataAgeMs: number | undefined;
+    /**
+     * Only provided in the log when the DataAction is "Use" and a subsequent
+     * promise will return another "Use" with fresh data. This should be used
+     * at the moment only by the fetchFastAndFresh and allows to get better
+     * telemetry when combined with dataAgeMs.
+     */
+    useIsIntermediate?: boolean | undefined;
 }
