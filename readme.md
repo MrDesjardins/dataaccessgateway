@@ -304,6 +304,12 @@ Clear all data in the memory cache and clear all the persisten storage (without 
 If you want to have a button allowing your users to manually flush the cache. Often, a button in deep in the user's preference is suggested when debugging your application. It is easier to tell a user to flush the cache then doing multiple steps. Flushing the cache is always a good
 step when debugging inconsistent data.
 
+### Example
+
+``` 
+DataAccessGateway("AppName").deleteAllDataFromAllCache();
+``` 
+
 # On-going HTTP Request
 
 In all cases, there is also a simple mechanism to avoid querying the same on-going request. If for example a request is performing a long fetch and many same query are requested, the subsequent queries will wait the former request response. This avoid having many similar query in queue.
