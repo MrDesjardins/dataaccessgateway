@@ -958,7 +958,8 @@ export class DataAccessSingleton implements IDataAccessSingleton {
             const newPerformanceInsight: PerformanceRequestInsight = {
                 fetch: {
                     startMs: 0,
-                    stopMs: 0
+                    stopMs: 0,
+                    elapsedMs: 0
                 }
             };
             this.performanceInsights.set(requestId, newPerformanceInsight);
@@ -1018,21 +1019,25 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         const stopTime = this.getActualTimeTick();
         if (source === undefined) {
             insight.fetch.stopMs = stopTime;
+            insight.fetch.elapsedMs = insight.fetch.stopMs - insight.fetch.startMs;
         } else {
             switch (source) {
                 case DataSource.HttpRequest:
                     if (insight.httpRequest !== undefined) {
                         insight.httpRequest.stopMs = stopTime;
+                        insight.httpRequest.elapsedMs = insight.httpRequest.stopMs - insight.httpRequest.startMs;
                     }
                     break;
                 case DataSource.MemoryCache:
                     if (insight.memoryCache !== undefined) {
                         insight.memoryCache.stopMs = stopTime;
+                        insight.memoryCache.elapsedMs = insight.memoryCache.stopMs - insight.memoryCache.startMs;
                     }
                     break;
                 case DataSource.PersistentStorageCache:
                     if (insight.persistentStorageCache !== undefined) {
                         insight.persistentStorageCache.stopMs = stopTime;
+                        insight.persistentStorageCache.elapsedMs = insight.persistentStorageCache.stopMs - insight.persistentStorageCache.startMs;
                     }
                     break;
                 case DataSource.System:

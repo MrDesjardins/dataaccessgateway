@@ -69,6 +69,7 @@ export interface OnGoingAjaxRequest {
 export interface PerformanceTimeMarker {
     startMs: number;
     stopMs?: number;
+    elapsedMs?: number;
 }
 export interface PerformanceRequestInsight {
     fetch: PerformanceTimeMarker;
