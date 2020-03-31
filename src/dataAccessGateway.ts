@@ -213,7 +213,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
      */
     public async fetchFresh<T extends CachedType>(request: AjaxRequestWithCache): Promise<DataResponse<T>> {
         const requestInternal = this.setDefaultRequestValues(request, FetchType.Fresh); // Default values
-        this.setDefaultCache(requestInternal); // We enforce a minimum memory cache of few seconds
+        this.setDefaultFastCache(requestInternal); // We enforce a minimum memory cache of few seconds
         this.startPerformanceInsight(requestInternal.id); // Full fetch performance
         this.startPerformanceInsight(requestInternal.id, DataSource.MemoryCache); // Performance for memory only
         const memoryCacheValue: CachedData<T> | undefined = this.tryMemoryCacheFetching<T>(requestInternal);
