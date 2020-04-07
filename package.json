@@ -1,6 +1,6 @@
 {
     "name": "dataaccessgateway",
-    "version": "0.0.54",
+    "version": "0.0.55",
     "description": "A simple library that cache in two different levels HTTP requests",
     "repository": {
         "type": "git",
