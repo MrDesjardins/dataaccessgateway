@@ -1,8 +1,31 @@
 import { AxiosResponse } from "axios";
 import { Dexie } from "dexie";
 import { DataAccessIndexDbDatabase, DataAccessSingleton, DeleteCacheOptions } from "../src/dataAccessGateway";
-import { AjaxRequestInternal, AjaxRequestWithCache, CacheConfiguration, CacheDataWithId, CachedData, DataResponse, DataSource, FetchType, HttpMethod, OnGoingAjaxRequest, PerformanceRequestInsight } from "../src/model";
-import { getDataResponse, getMockAjaxRequest, getMockAjaxRequestExecute, getMockAjaxRequestInternal, getMockAjaxRequestWithId, getMockAxiosRequestConfig, getMockOnGoingAjaxRequest, getPromiseRetarder, PromiseRetarder } from "./dataAccessGateway.mock";
+import {
+    AjaxRequestInternal,
+    AjaxRequestWithCache,
+    CacheConfiguration,
+    CacheDataWithId,
+    CachedData,
+    DataResponse,
+    DataSource,
+    FetchType,
+    HttpMethod,
+    OnGoingAjaxRequest,
+    PerformanceRequestInsight,
+    AjaxRequest,
+} from "../src/model";
+import {
+    getDataResponse,
+    getMockAjaxRequest,
+    getMockAjaxRequestExecute,
+    getMockAjaxRequestInternal,
+    getMockAjaxRequestWithId,
+    getMockAxiosRequestConfig,
+    getMockOnGoingAjaxRequest,
+    getPromiseRetarder,
+    PromiseRetarder,
+} from "./dataAccessGateway.mock";
 const DATABASE_NAME = "Test";
 interface FakeObject {
     id: string;
@@ -12,22 +35,22 @@ const NOW = 1538771480773;
 const cacheDataExpired: CachedData<string> = {
     expirationDateTimeMs: NOW - 10000,
     payload: "Test",
-    webFetchDateTimeMs: NOW - 20000
+    webFetchDateTimeMs: NOW - 20000,
 };
 const cacheDataNotExpired: CachedData<string> = {
     expirationDateTimeMs: NOW + 10000,
     payload: "Test",
-    webFetchDateTimeMs: NOW - 1
+    webFetchDateTimeMs: NOW - 1,
 };
 const dataResponseFromCache: DataResponse<string> = {
     result: "Test",
     source: DataSource.HttpRequest,
-    webFetchDateTimeMs: NOW
+    webFetchDateTimeMs: NOW,
 };
 const defaultPerformanceInsight: PerformanceRequestInsight = {
     fetch: {
-        startMs: 0
-    }
+        startMs: 0,
+    },
 };
 describe("DataAccessIndexDbDatabase", () => {
     let didb: DataAccessIndexDbDatabase;
@@ -66,7 +89,7 @@ describe("DataAccessSingleton", () => {
     let request: AjaxRequestWithCache;
     let requestWithId: AjaxRequestInternal;
     let ajaxResponse: AxiosResponse<string>;
-    let spySetDefaultRequestId: jest.MockInstance<(request: AjaxRequestWithCache, fetchType: FetchType) => void>;
+    let spySetDefaultRequestId: jest.MockInstance<AjaxRequestInternal, [AjaxRequest, FetchType?]>;
 
     beforeEach(() => {
         das = new DataAccessSingleton(DATABASE_NAME);
@@ -75,23 +98,23 @@ describe("DataAccessSingleton", () => {
         das.options.logError = jest.fn();
         request = {
             request: {
-                url: "http://request"
-            }
+                url: "http://request",
+            },
         };
         requestWithId = {
             id: "id",
             fetchType: FetchType.Fast,
             request: {
-                url: "http://request"
+                url: "http://request",
             },
-            httpMethod: HttpMethod.GET
+            httpMethod: HttpMethod.GET,
         };
         ajaxResponse = {
             status: 200,
             data: "payload",
             statusText: "Good",
             config: {},
-            headers: {}
+            headers: {},
         };
         das.getCurrentDateTimeMs = jest.fn().mockReturnValue(NOW);
     });
@@ -138,8 +161,8 @@ describe("DataAccessSingleton", () => {
                                 data: {
                                     source: "dataaccessgateway-devtools",
                                     name: "action",
-                                    data: { id: "signature", value: true }
-                                }
+                                    data: { id: "signature", value: true },
+                                },
                             });
                         });
                         it("keeps default value of generateSignature to true", () => {
@@ -153,8 +176,8 @@ describe("DataAccessSingleton", () => {
                                 data: {
                                     source: "dataaccessgateway-devtools",
                                     name: "action",
-                                    data: { id: "NOT GOOD" }
-                                }
+                                    data: { id: "NOT GOOD" },
+                                },
                             });
                         });
                         it("keeps default value of generateSignature to false", () => {
@@ -169,8 +192,8 @@ describe("DataAccessSingleton", () => {
                             data: {
                                 source: "dataaccessgateway-devtools",
                                 name: "NOT GOOD",
-                                data: { id: "signature" }
-                            }
+                                data: { id: "signature" },
+                            },
                         });
                     });
                     it("keeps default value of generateSignature to false", () => {
@@ -185,8 +208,8 @@ describe("DataAccessSingleton", () => {
                         data: {
                             source: undefined,
                             name: "action",
-                            data: { id: "signature" }
-                        }
+                            data: { id: "signature" },
+                        },
                     });
                 });
                 it("keeps default value of generateSignature to false", () => {
@@ -224,7 +247,7 @@ describe("DataAccessSingleton", () => {
         const requestWithoutDependencies = getMockAjaxRequestExecute("1");
         const requestWithDependencies = getMockAjaxRequestExecute("1", [
             getMockAjaxRequest("2"),
-            getMockAjaxRequest("3")
+            getMockAjaxRequest("3"),
         ]);
         describe("when invalidation is undefined", () => {
             beforeEach(() => {
@@ -286,8 +309,8 @@ describe("DataAccessSingleton", () => {
         beforeEach(() => {
             request = {
                 request: {
-                    url: "http://request"
-                }
+                    url: "http://request",
+                },
             };
         });
         describe("when has an id ", () => {
@@ -295,8 +318,8 @@ describe("DataAccessSingleton", () => {
                 request = {
                     id: "MyId",
                     request: {
-                        url: "http://request"
-                    }
+                        url: "http://request",
+                    },
                 };
             });
             it("keeps the id", () => {
@@ -309,8 +332,8 @@ describe("DataAccessSingleton", () => {
                 request = {
                     id: undefined,
                     request: {
-                        url: "http://request"
-                    }
+                        url: "http://request",
+                    },
                 };
             });
             describe("and request URL is undefined ", () => {
@@ -460,8 +483,8 @@ describe("DataAccessSingleton", () => {
         beforeEach(() => {
             request = {
                 request: {
-                    url: "http://request"
-                }
+                    url: "http://request",
+                },
             };
         });
         describe("fast", () => {
@@ -526,10 +549,10 @@ describe("DataAccessSingleton", () => {
         beforeEach(() => {
             request = {
                 request: {
-                    url: "http://request"
+                    url: "http://request",
                 },
                 memoryCache: { lifespanInSeconds: 1 },
-                persistentCache: { lifespanInSeconds: 1 }
+                persistentCache: { lifespanInSeconds: 1 },
             };
         });
         describe("when cache disabled", () => {
@@ -630,7 +653,7 @@ describe("DataAccessSingleton", () => {
                         expect(result).toEqual({
                             result: "Test",
                             source: DataSource.MemoryCache,
-                            webFetchDateTimeMs: cacheDataExpired.webFetchDateTimeMs
+                            webFetchDateTimeMs: cacheDataExpired.webFetchDateTimeMs,
                         });
                     });
                 });
@@ -666,7 +689,7 @@ describe("DataAccessSingleton", () => {
                         expect(result).toEqual({
                             result: "Test",
                             source: DataSource.PersistentStorageCache,
-                            webFetchDateTimeMs: cacheDataExpired.webFetchDateTimeMs
+                            webFetchDateTimeMs: cacheDataExpired.webFetchDateTimeMs,
                         });
                     });
                 });
@@ -772,10 +795,10 @@ describe("DataAccessSingleton", () => {
         beforeEach(() => {
             request = {
                 request: {
-                    url: "http://request"
+                    url: "http://request",
                 },
                 memoryCache: { lifespanInSeconds: 1 },
-                persistentCache: { lifespanInSeconds: 1 }
+                persistentCache: { lifespanInSeconds: 1 },
             };
         });
         describe("when cache disabled", () => {
@@ -883,7 +906,7 @@ describe("DataAccessSingleton", () => {
                             result: "Test",
                             source: DataSource.MemoryCache,
                             webFetchDateTimeMs: cacheDataExpired.webFetchDateTimeMs,
-                            webPromise: jest.fn().mockResolvedValue(dataResponseFromCache)()
+                            webPromise: jest.fn().mockResolvedValue(dataResponseFromCache)(),
                         });
                     });
                     it("sets the promise of the fetch in the dual response", async () => {
@@ -929,7 +952,7 @@ describe("DataAccessSingleton", () => {
                             result: "Test",
                             source: DataSource.PersistentStorageCache,
                             webFetchDateTimeMs: cacheDataExpired.webFetchDateTimeMs,
-                            webPromise: jest.fn().mockResolvedValue(dataResponseFromCache)()
+                            webPromise: jest.fn().mockResolvedValue(dataResponseFromCache)(),
                         });
                     });
                     it("sets the promise of the fetch in the dual response", async () => {
@@ -1197,7 +1220,7 @@ describe("DataAccessSingleton", () => {
         describe("when memory cache is defined", () => {
             beforeEach(() => {
                 requestWithId.memoryCache = {
-                    lifespanInSeconds: 120
+                    lifespanInSeconds: 120,
                 };
             });
             it("adds in the memory cache", async () => {
@@ -1217,7 +1240,7 @@ describe("DataAccessSingleton", () => {
         describe("when persistent cache is defined", () => {
             beforeEach(() => {
                 requestWithId.persistentCache = {
-                    lifespanInSeconds: 120
+                    lifespanInSeconds: 120,
                 };
             });
             it("adds in the persistent cache", async () => {
@@ -1255,8 +1278,8 @@ describe("DataAccessSingleton", () => {
         beforeEach(() => {
             request = {
                 request: {
-                    url: "http://request"
-                }
+                    url: "http://request",
+                },
             };
             das.setConfiguration({ isCacheEnabled: true });
             das.deleteDataFromCache = jest.fn().mockResolvedValue(undefined);
@@ -1274,8 +1297,8 @@ describe("DataAccessSingleton", () => {
             beforeEach(() => {
                 request = {
                     request: {
-                        url: "http://request"
-                    }
+                        url: "http://request",
+                    },
                 };
                 das.setConfiguration({ isCacheEnabled: true });
                 das.deleteDataFromCache = jest.fn().mockResolvedValue(undefined);
@@ -1292,8 +1315,8 @@ describe("DataAccessSingleton", () => {
         beforeEach(() => {
             request = {
                 request: {
-                    url: "http://request"
-                }
+                    url: "http://request",
+                },
             };
             das.setConfiguration({ isCacheEnabled: true });
             das.setDefaultCache = jest.fn();
@@ -1395,7 +1418,7 @@ describe("DataAccessSingleton", () => {
                             contentOfSaveCache = {
                                 result: cacheDataNotExpired.payload,
                                 source: DataSource.MemoryCache,
-                                webFetchDateTimeMs: cacheDataNotExpired.webFetchDateTimeMs
+                                webFetchDateTimeMs: cacheDataNotExpired.webFetchDateTimeMs,
                             };
                             das.saveCache = jest.fn().mockReturnValue(contentOfSaveCache);
                             das.tryMemoryCacheFetching = jest.fn().mockReturnValue(cacheDataNotExpired);
@@ -1462,7 +1485,7 @@ describe("DataAccessSingleton", () => {
     describe("tryMemoryCacheFetching", () => {
         beforeEach(() => {
             requestWithId.memoryCache = {
-                lifespanInSeconds: 120
+                lifespanInSeconds: 120,
             };
         });
         describe("when cache configuration is undefined", () => {
@@ -1540,7 +1563,7 @@ describe("DataAccessSingleton", () => {
         describe("when persistent cache is configured", () => {
             beforeEach(() => {
                 requestWithId.persistentCache = {
-                    lifespanInSeconds: 120
+                    lifespanInSeconds: 120,
                 };
             });
             describe("when cache disabled", () => {
@@ -1711,7 +1734,7 @@ describe("DataAccessSingleton", () => {
             });
         });
         describe("when indexDb", () => {
-            beforeEach(() => { 
+            beforeEach(() => {
                 das.openIndexDb = new DataAccessIndexDbDatabase("testDB");
                 das.openIndexDb.tables[0].clear = jest.fn();
             });
@@ -1809,7 +1832,7 @@ describe("DataAccessSingleton", () => {
                 it("returns the response", () => {
                     const promiseReturn = das.fetchWithAjax(request);
                     promiseNotFulfilled.resolveNow();
-                    promiseReturn.then(v => {
+                    promiseReturn.then((v) => {
                         expect(v).toEqual("data");
                     });
                 });
@@ -1833,7 +1856,7 @@ describe("DataAccessSingleton", () => {
                 it("rejects the promise", () => {
                     const promiseReturn = das.fetchWithAjax(request);
                     promiseNotFulfilled.rejectNow();
-                    promiseReturn.catch(e => {
+                    promiseReturn.catch((e) => {
                         expect(e).toBeDefined();
                     });
                     expect.assertions(1);
@@ -1862,7 +1885,7 @@ describe("DataAccessSingleton", () => {
                 id: "id",
                 fetchType: FetchType.Fast,
                 request: {},
-                httpMethod: HttpMethod.GET
+                httpMethod: HttpMethod.GET,
             };
         });
         it("removes from on-going list", () => {
@@ -1876,8 +1899,8 @@ describe("DataAccessSingleton", () => {
         beforeEach(() => {
             request = {
                 request: {
-                    url: "http://request"
-                }
+                    url: "http://request",
+                },
             };
             das.setConfiguration({ isCacheEnabled: true });
             das.setDefaultCache = jest.fn();
@@ -2150,7 +2173,7 @@ describe("DataAccessSingleton", () => {
                     beforeEach(() => {
                         das.options.alterObjectBeforeHashing = () => {
                             return {
-                                a: 1
+                                a: 1,
                             };
                         };
                     });
@@ -2401,7 +2424,7 @@ describe("DataAccessSingleton", () => {
                     method: "GET",
                     url: "http://longurl.withsubdomain.domain.com/api/read/version1/entityA/123/entityB/1",
                     baseURL: "",
-                    data: {}
+                    data: {},
                 });
                 obj2 = JSON.stringify({
                     id: undefined,
@@ -2409,7 +2432,7 @@ describe("DataAccessSingleton", () => {
                     method: "GET",
                     url: "http://longurl.withsubdomain.domain.com/api/read/version1/entityA/121/entityB/1",
                     baseURL: "",
-                    data: {}
+                    data: {},
                 });
             });
             it("returns different hash", () => {
