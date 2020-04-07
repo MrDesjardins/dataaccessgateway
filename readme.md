@@ -143,11 +143,11 @@ Here is the flow from the actor request call up to when the data is coming back.
 
 This is the most basic call. It uses many defaults. This will have a memory cache and persisted cache of 5 minutes and use the URL has unique key for every request. The unique key is used for two purposes. The first purpose is to make sure that only one unique query is executed at the same time and the second goal is to store the data in the cache.
 ```
-// Normal Axios Request
+// Normal Axios Request@
 const request: AxiosRequestConfig = { method: "GET", url: url};
 
 // Execute the request through DataAccessGateway
-const response = await DataAccessGateway("AppName").fastAndFreshFlowDiagram.png<YourEntityResponse>({request: request});
+const response = await DataAccessGateway("AppName").fastAndFresh<YourEntityResponse>({request: request});
 
 // Render the user interface with response.result
 // Subscribe to the promise of the response to update with fresh data later
