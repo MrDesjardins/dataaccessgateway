@@ -14,6 +14,8 @@ export interface DataAccessSingletonOptions {
     logInfo: (info: LogInfo) => void;
     alterObjectBeforeHashing?: <T>(obj: T) => any;
     onBackgroundAjaxFetchFailure: (response: AxiosResponse | AxiosError) => void;
+    onBeforeAjaxRequest: (request: AxiosRequestConfig) => void;
+    onAfterAjaxRequest: (request: AxiosRequestConfig) => void;
 }
 /**
  * The role of this interface is to limit what is public. This allow to have almost every
