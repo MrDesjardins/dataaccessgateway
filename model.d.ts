@@ -5,9 +5,11 @@ export declare enum FetchType {
     Fresh = "Fresh",
     Web = "Web",
     FastAndFresh = "FastAndWeb",
-    Execute = "Execute"
+    Execute = "Execute",
+    FastAndFreshObject = "FastAndFreshObject"
 }
 export declare enum HttpMethod {
+    NONE = "NONE",
     GET = "GET",
     HEAD = "HEAD",
     POST = "POST",
@@ -32,12 +34,19 @@ export interface AjaxRequestExecute extends AjaxRequest {
     invalidateRequests?: AjaxRequest[];
     forceInvalidateAndRefresh?: boolean;
 }
-export interface AjaxRequestWithCache extends AjaxRequest {
+export interface AjaxRequestWithCache extends RequestWithCache, AjaxRequest {
+}
+export interface AjaxRequestInternal extends AjaxRequestWithCache {
+    id: string;
+    fetchType: FetchType | undefined;
+    httpMethod: HttpMethod;
+}
+export interface RequestWithCache {
     /**
-     * The memory cache configuration. It contains the lifespan before ejecting the data from the cache.
-     * When not defined is set to X seconds (see constant in the class)
-     * When explicitly set to NULL, the request is not cached even if the option 'isCacheMandatoryIfEnabled' is set to true
-     */
+    * The memory cache configuration. It contains the lifespan before ejecting the data from the cache.
+    * When not defined is set to X seconds (see constant in the class)
+    * When explicitly set to NULL, the request is not cached even if the option 'isCacheMandatoryIfEnabled' is set to true
+    */
     memoryCache?: CacheConfiguration | null;
     /**
      * When defined, the data is set into the persistent storage. Subsequent calls will get the data from the persistent storage
@@ -48,10 +57,10 @@ export interface AjaxRequestWithCache extends AjaxRequest {
      */
     persistentCache?: CacheConfiguration | null;
 }
-export interface AjaxRequestInternal extends AjaxRequestWithCache {
+export interface ObjectRequestWithCache<TFetchValue> extends RequestWithCache {
     id: string;
-    fetchType: FetchType | undefined;
-    httpMethod: HttpMethod;
+    syntheticUrl: string;
+    fetch: () => Promise<TFetchValue>;
 }
 export interface CachedData<T> {
     webFetchDateTimeMs: number;

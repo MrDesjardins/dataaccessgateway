@@ -18,6 +18,7 @@ import {
     LogInfo,
     OnGoingAjaxRequest,
     PerformanceRequestInsight,
+    ObjectRequestWithCache
 } from "./model";
 export class DataAccessIndexDbDatabase extends Dexie {
     public data!: Dexie.Table<CacheDataWithId<any>, string>; // Will be initialized later
@@ -55,11 +56,11 @@ export interface DataAccessSingletonOptions {
  */
 export interface IDataAccessSingleton {
     setConfiguration(options?: Partial<DataAccessSingletonOptions>): void;
-    fetch<T extends CachedType>(fetchType: FetchType, request: AjaxRequestWithCache): Promise<DataResponse<T>>;
     fetchFresh<T extends CachedType>(request: AjaxRequestWithCache): Promise<DataResponse<T>>;
     fetchFast<T extends CachedType>(request: AjaxRequestWithCache): Promise<DataResponse<T>>;
     fetchWeb<T extends CachedType>(request: AjaxRequestWithCache): Promise<DataResponse<T>>;
     fetchFastAndFresh<T extends CachedType>(request: AjaxRequestWithCache): Promise<DataDualResponse<T>>;
+    fetchFastAndFreshObject<T extends CachedType>(request: ObjectRequestWithCache<T>): Promise<DataDualResponse<T>>;
     deleteDataFromCache(request: AjaxRequest, options?: DeleteCacheOptions): Promise<void>;
     deleteAllDataFromAllCache(): Promise<void>;
     deletePersistentStorage(name: string): Promise<void>;
@@ -191,20 +192,6 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         }
     }
 
-    public fetch<T extends CachedType>(fetchType: FetchType, request: AjaxRequestWithCache): Promise<DataResponse<T>> {
-        switch (fetchType) {
-            case FetchType.Fast:
-                return this.fetchFast(request);
-            case FetchType.Fresh:
-                return this.fetchFresh(request);
-            case FetchType.Web:
-                return this.fetchWeb(request);
-            case FetchType.Execute:
-                return this.execute(request);
-            case FetchType.FastAndFresh:
-                return this.fetchFastAndFresh(request);
-        }
-    }
     public async fetchWeb<T extends CachedType>(request: AjaxRequestWithCache): Promise<DataResponse<T>> {
         const requestInternal = this.setDefaultRequestValues(request, FetchType.Web); // Default values
         this.startPerformanceInsight(requestInternal.id);
@@ -519,6 +506,226 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         }
     }
 
+    public async fetchFastAndFreshObject<T extends CachedType>(request: ObjectRequestWithCache<T>): Promise<DataDualResponse<T>> {
+        const requestInternal: AjaxRequestInternal = {
+            fetchType: FetchType.FastAndFreshObject,
+            httpMethod: HttpMethod.NONE,
+            id: request.id,
+            memoryCache: request.memoryCache,
+            persistentCache: request.persistentCache,
+            request: {
+                url: request.syntheticUrl
+            }
+        };
+        this.setDefaultFastCache(requestInternal); // We enforce a minimum memory cache of few seconds
+        this.startPerformanceInsight(request.id);
+
+        // First: Cache is disabled, hence fetch right away
+        if (!this.options.isCacheEnabled) {
+            try {
+                const response: DataResponse<T> = await this.fetchObjectAndSaveInCacheIfExpired(requestInternal, request, DataSource.HttpRequest); // Fetch calls the function passed by the consumer and does NOT perform Ajax
+                this.stopPerformanceInsight(requestInternal.id);
+                this.logInfo({
+                    action: DataAction.Use,
+                    id: requestInternal.id,
+                    url: requestInternal.request.url!,
+                    source: DataSource.HttpRequest,
+                    performanceInsight: this.setDataSize(
+                        this.getPerformanceInsight(requestInternal.id),
+                        response.result
+                    ),
+                    dataSignature: this.writeSignature(response.result),
+                    fetchType: requestInternal.fetchType,
+                    httpMethod: requestInternal.httpMethod,
+                    dataAgeMs: this.getCurrentDateTimeMs() - response.webFetchDateTimeMs,
+                    useIsIntermediate: false,
+                });
+                this.deletePerformanceInsight(requestInternal.id);
+                return {
+                    ...response,
+                    webPromise: undefined,
+                };
+            } catch (error) {
+                this.stopPerformanceInsight(requestInternal.id);
+                this.logError({
+                    id: requestInternal.id,
+                    url: requestInternal.request.url!,
+                    error: error,
+                    source: DataSource.HttpRequest,
+                    action: DataAction.Fetch,
+                    performanceInsight: this.getPerformanceInsight(requestInternal.id),
+                    fetchType: requestInternal.fetchType,
+                    httpMethod: requestInternal.httpMethod,
+                });
+                this.deletePerformanceInsight(requestInternal.id);
+                throw error;
+            }
+        }
+
+        // Check memory cache first
+        const memoryCacheEntry: CachedData<T> | undefined = this.tryMemoryCacheFetching(requestInternal);
+        if (memoryCacheEntry === undefined) {
+            let persistentStorageValue: CachedData<T> | undefined = undefined;
+            // Not in memory, check in long term storage
+            try {
+                persistentStorageValue = await this.getPersistentStoreData<T>(requestInternal);
+            } catch (error) {
+                this.stopPerformanceInsight(requestInternal.id);
+                this.deletePerformanceInsight(requestInternal.id);
+                // We do not log error because the function getPersistentStoreData is already covering the persistence error log
+                // We do not throw, the value will be undefined and Ajax will kick in
+            }
+            if (persistentStorageValue === undefined) {
+                // Not in the persistent storage means we must fetch from API
+                try {
+                    const response: DataResponse<T> = await this.fetchObjectAndSaveInCacheIfExpired<T>(
+                        requestInternal,
+                        request,
+                        DataSource.HttpRequest
+                    );
+                    this.stopPerformanceInsight(requestInternal.id);
+                    this.logInfo({
+                        action: DataAction.Use,
+                        id: requestInternal.id,
+                        url: requestInternal.request.url!,
+                        source: DataSource.HttpRequest,
+                        performanceInsight: this.setDataSize(
+                            this.getPerformanceInsight(requestInternal.id),
+                            response.result
+                        ),
+                        dataSignature: this.writeSignature(response.result),
+                        fetchType: requestInternal.fetchType,
+                        httpMethod: requestInternal.httpMethod,
+                        dataAgeMs: this.getCurrentDateTimeMs() - response.webFetchDateTimeMs,
+                        useIsIntermediate: false,
+                    });
+                    this.deletePerformanceInsight(requestInternal.id);
+                    return {
+                        ...response,
+                        webPromise: undefined, // undefined because the response promise is the web
+                    };
+                } catch (error) {
+                    this.stopPerformanceInsight(requestInternal.id);
+                    this.deletePerformanceInsight(requestInternal.id);
+                    // We do not log error because the function getPersistentStoreData is already covering the persistence error log
+                    throw error;
+                }
+            } else {
+                // We have something from the persistent cache
+                const persistentStorageEntry = persistentStorageValue;
+                if (requestInternal.memoryCache !== undefined && requestInternal.memoryCache !== null) {
+                    this.addInMemoryCache(requestInternal, persistentStorageEntry.payload);
+                }
+                // It's expired which mean we fetch to get fresh data HOWEVER, we will return the obsolete data to have a fast response
+                const responseWeb = this.fetchObjectAndSaveInCacheIfExpired<T>(
+                    requestInternal,
+                    request,
+                    DataSource.PersistentStorageCache,
+                    persistentStorageEntry
+                );
+
+                if (this.isPromise(responseWeb)) {
+                    responseWeb.then((dataResponse: DataResponse<T>) => {
+                        this.logInfo({
+                            action: DataAction.Use,
+                            id: requestInternal.id,
+                            url: requestInternal.request.url!,
+                            source: dataResponse.source,
+                            performanceInsight: this.setDataSize(
+                                this.getPerformanceInsight(requestInternal.id),
+                                dataResponse.result
+                            ),
+                            dataSignature: this.writeSignature(dataResponse.result),
+                            fetchType: requestInternal.fetchType,
+                            httpMethod: requestInternal.httpMethod,
+                            dataAgeMs: 0,
+                            useIsIntermediate: false,
+                        });
+                    });
+                }
+                // Return the persistent storage even if expired
+                this.stopPerformanceInsight(requestInternal.id);
+                this.logInfo({
+                    action: DataAction.Use,
+                    id: requestInternal.id,
+                    url: requestInternal.request.url!,
+                    source: DataSource.PersistentStorageCache,
+                    performanceInsight: this.setDataSize(
+                        this.getPerformanceInsight(requestInternal.id),
+                        persistentStorageEntry.payload
+                    ),
+                    dataSignature: this.writeSignature(persistentStorageEntry.payload),
+                    fetchType: requestInternal.fetchType,
+                    httpMethod: requestInternal.httpMethod,
+                    dataAgeMs: this.getCurrentDateTimeMs() - persistentStorageEntry.webFetchDateTimeMs,
+                    useIsIntermediate: true,
+                });
+                this.deletePerformanceInsight(requestInternal.id);
+                const responseDual: DataDualResponse<T> = {
+                    source: DataSource.PersistentStorageCache,
+                    result: persistentStorageEntry.payload,
+                    webFetchDateTimeMs: persistentStorageEntry.webFetchDateTimeMs,
+                    webPromise: this.isPromise(responseWeb) ? responseWeb : undefined,
+                };
+                return Promise.resolve(responseDual);
+            }
+        } else {
+            const responseWeb = this.fetchObjectAndSaveInCacheIfExpired<T>(
+                requestInternal,
+                request,
+                DataSource.MemoryCache,
+                memoryCacheEntry
+            ); // We have something in the memory, but we might still want to fetch if expire for future requests
+
+            if (this.isPromise(responseWeb)) {
+                responseWeb.then((dataResponse: DataResponse<T>) => {
+                    this.logInfo({
+                        action: DataAction.Use,
+                        id: requestInternal.id,
+                        url: requestInternal.request.url!,
+                        source: dataResponse.source,
+                        performanceInsight: this.setDataSize(
+                            this.getPerformanceInsight(requestInternal.id),
+                            dataResponse.result
+                        ),
+                        dataSignature: this.writeSignature(dataResponse.result),
+                        fetchType: requestInternal.fetchType,
+                        httpMethod: requestInternal.httpMethod,
+                        dataAgeMs: 0,
+                        useIsIntermediate: false,
+                    });
+                });
+            }
+            this.stopPerformanceInsight(requestInternal.id, DataSource.MemoryCache);
+            this.stopPerformanceInsight(requestInternal.id);
+            this.logInfo({
+                action: DataAction.Use,
+                id: requestInternal.id,
+                url: requestInternal.request.url!,
+                source: DataSource.MemoryCache,
+                performanceInsight: this.setDataSize(
+                    this.getPerformanceInsight(requestInternal.id),
+                    memoryCacheEntry.payload
+                ),
+                dataSignature: this.writeSignature(memoryCacheEntry.payload),
+                fetchType: requestInternal.fetchType,
+                httpMethod: requestInternal.httpMethod,
+                dataAgeMs: this.getCurrentDateTimeMs() - memoryCacheEntry.webFetchDateTimeMs,
+                useIsIntermediate: true,
+            });
+            this.deletePerformanceInsight(requestInternal.id);
+            const responseDual: DataDualResponse<T> = {
+                source: DataSource.MemoryCache,
+                result: memoryCacheEntry.payload,
+                webFetchDateTimeMs: memoryCacheEntry.webFetchDateTimeMs,
+                webPromise: this.isPromise(responseWeb) ? responseWeb : undefined,
+            };
+            return Promise.resolve(responseDual);
+        }
+    }
+
+
+
     public async fetchFastAndFresh<T extends CachedType>(request: AjaxRequestWithCache): Promise<DataDualResponse<T>> {
         const requestInternal = this.setDefaultRequestValues(request, FetchType.FastAndFresh); // Default values
         this.setDefaultFastCache(requestInternal); // We enforce a minimum memory cache of few seconds
@@ -732,6 +939,67 @@ export class DataAccessSingleton implements IDataAccessSingleton {
     ): o is Promise<DataResponse<T>> {
         return (o as any).then;
     }
+
+    public fetchObjectAndSaveInCacheIfExpired<T extends CachedType>(
+        requestInternal: AjaxRequestInternal,
+        request: ObjectRequestWithCache<T>,
+        source: DataSource,
+        cacheEntry?: CachedData<T> | undefined
+    ): Promise<DataResponse<T>> | DataResponse<T> {
+        const ERROR_HANDLED_MSG = "Cannot cache request because an exception occured while fetching the object";
+        if (cacheEntry === undefined || this.getCurrentDateTimeMs() > cacheEntry.expirationDateTimeMs) {
+            this.startPerformanceInsight(requestInternal.id, DataSource.HttpRequest);
+            return request.fetch()
+                .then((value: T) => {
+                    this.setDataSize(
+                        this.stopPerformanceInsight(requestInternal.id, DataSource.HttpRequest),
+                        value
+                    );
+
+                    this.logInfo({
+                        action: DataAction.Fetch,
+                        id: requestInternal.id,
+                        url: requestInternal.request.url!,
+                        source: DataSource.HttpRequest,
+                        performanceInsight: this.getPerformanceInsight(requestInternal.id),
+                        dataSignature: this.writeSignature(value),
+                        fetchType: requestInternal.fetchType,
+                        httpMethod: requestInternal.httpMethod,
+                        dataAgeMs: 0,
+                    });
+                    return this.saveCache(requestInternal, {
+                        source: DataSource.HttpRequest,
+                        result: value,
+                        webFetchDateTimeMs: this.getCurrentDateTimeMs(),
+                    });
+
+                })
+                .catch((error) => {
+                    this.stopPerformanceInsight(this.getPerformanceInsight(requestInternal.id), DataSource.HttpRequest);
+                    this.logError({
+                        id: requestInternal.id,
+                        url: requestInternal.request.url!,
+                        error: error,
+                        source: DataSource.HttpRequest,
+                        action: DataAction.Fetch,
+                        performanceInsight: this.getPerformanceInsight(requestInternal.id),
+                        fetchType: requestInternal.fetchType,
+                        httpMethod: requestInternal.httpMethod,
+                    });
+                    if (error.message !== ERROR_HANDLED_MSG) {
+                        // To improve. At the moment, trick to avoid double sending
+                        this.options.onBackgroundAjaxFetchFailure(error);
+                    }
+                    throw error;
+                });
+        } else {
+            return {
+                source: source, // This might be from the persistent storage as well
+                result: cacheEntry.payload,
+                webFetchDateTimeMs: cacheEntry.webFetchDateTimeMs,
+            };
+        }
+    }
     /**
      * fetchAndSaveInCacheIfExpired verifies if the data in the cache entry is expired. If it is, it performs
      * an Ajax call to get a fresh version and saves it in the cache. If the data is not expired, it returns
@@ -823,6 +1091,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
         }
         return { id: request.id, fetchType: fetchType, httpMethod: request.request.method as HttpMethod, ...request };
     }
+
 
     public setDefaultCache(requestInternal: AjaxRequestInternal): void {
         if (requestInternal.memoryCache === undefined && this.options.isCacheMandatoryIfEnabled) {
