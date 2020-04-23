@@ -1,6 +1,6 @@
 import { AxiosError, AxiosPromise, AxiosRequestConfig, AxiosResponse } from "axios";
 import Dexie from "dexie";
-import { AjaxRequest, AjaxRequestExecute, AjaxRequestInternal, AjaxRequestWithCache, CacheDataWithId, CachedData, CachedType, DataDualResponse, DataResponse, DataSource, FetchType, LogError, LogInfo, OnGoingAjaxRequest, PerformanceRequestInsight } from "./model";
+import { AjaxRequest, AjaxRequestExecute, AjaxRequestInternal, AjaxRequestWithCache, CacheDataWithId, CachedData, CachedType, DataDualResponse, DataResponse, DataSource, FetchType, LogError, LogInfo, OnGoingAjaxRequest, PerformanceRequestInsight, ObjectRequestWithCache } from "./model";
 export declare class DataAccessIndexDbDatabase extends Dexie {
     data: Dexie.Table<CacheDataWithId<any>, string>;
     constructor(databaseName: string);
@@ -24,11 +24,11 @@ export interface DataAccessSingletonOptions {
  */
 export interface IDataAccessSingleton {
     setConfiguration(options?: Partial<DataAccessSingletonOptions>): void;
-    fetch<T extends CachedType>(fetchType: FetchType, request: AjaxRequestWithCache): Promise<DataResponse<T>>;
     fetchFresh<T extends CachedType>(request: AjaxRequestWithCache): Promise<DataResponse<T>>;
     fetchFast<T extends CachedType>(request: AjaxRequestWithCache): Promise<DataResponse<T>>;
     fetchWeb<T extends CachedType>(request: AjaxRequestWithCache): Promise<DataResponse<T>>;
     fetchFastAndFresh<T extends CachedType>(request: AjaxRequestWithCache): Promise<DataDualResponse<T>>;
+    fetchFastAndFreshObject<T extends CachedType>(request: ObjectRequestWithCache<T>): Promise<DataDualResponse<T>>;
     deleteDataFromCache(request: AjaxRequest, options?: DeleteCacheOptions): Promise<void>;
     deleteAllDataFromAllCache(): Promise<void>;
     deletePersistentStorage(name: string): Promise<void>;
@@ -58,7 +58,6 @@ export declare class DataAccessSingleton implements IDataAccessSingleton {
     logInfo(info: Pick<LogInfo, Exclude<keyof LogInfo, "kind">>): void;
     logError(error: Pick<LogError, Exclude<keyof LogError, "kind">>): void;
     setConfiguration(options?: Partial<DataAccessSingletonOptions>): void;
-    fetch<T extends CachedType>(fetchType: FetchType, request: AjaxRequestWithCache): Promise<DataResponse<T>>;
     fetchWeb<T extends CachedType>(request: AjaxRequestWithCache): Promise<DataResponse<T>>;
     /**
      * Go in the memory cache first, then the persisted cache. In all level of cache, if the data is outdated it will fetch and
@@ -74,8 +73,10 @@ export declare class DataAccessSingleton implements IDataAccessSingleton {
      * to fetch the new value. Fetch fast works better if most of the data (if not all) is stored with a persistence
      */
     fetchFast<T extends CachedType>(request: AjaxRequestWithCache): Promise<DataResponse<T>>;
+    fetchFastAndFreshObject<T extends CachedType>(request: ObjectRequestWithCache<T>): Promise<DataDualResponse<T>>;
     fetchFastAndFresh<T extends CachedType>(request: AjaxRequestWithCache): Promise<DataDualResponse<T>>;
     isPromise<T extends CachedType>(o: Promise<DataResponse<T>> | DataResponse<T>): o is Promise<DataResponse<T>>;
+    fetchObjectAndSaveInCacheIfExpired<T extends CachedType>(requestInternal: AjaxRequestInternal, request: ObjectRequestWithCache<T>, source: DataSource, cacheEntry?: CachedData<T> | undefined): Promise<DataResponse<T>> | DataResponse<T>;
     /**
      * fetchAndSaveInCacheIfExpired verifies if the data in the cache entry is expired. If it is, it performs
      * an Ajax call to get a fresh version and saves it in the cache. If the data is not expired, it returns
