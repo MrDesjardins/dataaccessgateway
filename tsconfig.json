@@ -2,7 +2,7 @@
     "compilerOptions": {
         "rootDir": "src",
         "baseUrl": "src",
-        "outDir": ".",
+        "outDir": "./dist",
         "allowSyntheticDefaultImports": true,
         "alwaysStrict": true,
         "declaration": true,

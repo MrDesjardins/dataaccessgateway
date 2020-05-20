@@ -829,7 +829,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                 if (requestInternal.memoryCache !== undefined && requestInternal.memoryCache !== null) {
                     this.addInMemoryCache(requestInternal, persistentStorageEntry.payload);
                 }
-                // It's expired which mean we fetch to get fresh data HOWEVER, we will return the obsolete data to have a fast response
+                // It might be expired which mean we fetch to get fresh data HOWEVER, we will return the obsolete data to have a fast response
                 const responseWeb = this.fetchAndSaveInCacheIfExpired<T>(
                     requestInternal,
                     DataSource.PersistentStorageCache,
@@ -948,9 +948,12 @@ export class DataAccessSingleton implements IDataAccessSingleton {
     ): Promise<DataResponse<T>> | DataResponse<T> {
         const ERROR_HANDLED_MSG = "Cannot cache request because an exception occured while fetching the object";
         if (cacheEntry === undefined || this.getCurrentDateTimeMs() > cacheEntry.expirationDateTimeMs) {
-            this.startPerformanceInsight(requestInternal.id, DataSource.HttpRequest);
-            return request.fetch()
-                .then((value: T) => {
+            const cacheOnGoingEntry: OnGoingAjaxRequest<DataResponse<T>> | undefined = this.onGoingAjaxRequest.get(requestInternal.id);
+            if (cacheOnGoingEntry === undefined) {
+                this.startPerformanceInsight(requestInternal.id, DataSource.HttpRequest);
+                const fetchPromise = request.fetch().then((value: T) => {
+                    this.deleteOnGoingAjaxRequest(requestInternal);
+                    this.options.onAfterAjaxRequest(requestInternal.request);
                     this.setDataSize(
                         this.stopPerformanceInsight(requestInternal.id, DataSource.HttpRequest),
                         value
@@ -967,6 +970,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                         httpMethod: requestInternal.httpMethod,
                         dataAgeMs: 0,
                     });
+
                     return this.saveCache(requestInternal, {
                         source: DataSource.HttpRequest,
                         result: value,
@@ -974,24 +978,43 @@ export class DataAccessSingleton implements IDataAccessSingleton {
                     });
 
                 })
-                .catch((error) => {
-                    this.stopPerformanceInsight(this.getPerformanceInsight(requestInternal.id), DataSource.HttpRequest);
-                    this.logError({
-                        id: requestInternal.id,
-                        url: requestInternal.request.url!,
-                        error: error,
-                        source: DataSource.HttpRequest,
-                        action: DataAction.Fetch,
-                        performanceInsight: this.getPerformanceInsight(requestInternal.id),
-                        fetchType: requestInternal.fetchType,
-                        httpMethod: requestInternal.httpMethod,
+                    .catch((error) => {
+                        this.deleteOnGoingAjaxRequest(requestInternal);
+                        this.options.onAfterAjaxRequest(requestInternal.request);
+                        this.stopPerformanceInsight(this.getPerformanceInsight(requestInternal.id), DataSource.HttpRequest);
+                        this.logError({
+                            id: requestInternal.id,
+                            url: requestInternal.request.url!,
+                            error: error,
+                            source: DataSource.HttpRequest,
+                            action: DataAction.Fetch,
+                            performanceInsight: this.getPerformanceInsight(requestInternal.id),
+                            fetchType: requestInternal.fetchType,
+                            httpMethod: requestInternal.httpMethod,
+                        });
+                        if (error.message !== ERROR_HANDLED_MSG) {
+                            // To improve. At the moment, trick to avoid double sending
+                            this.options.onBackgroundAjaxFetchFailure(error);
+                        }
+                        throw error;
                     });
-                    if (error.message !== ERROR_HANDLED_MSG) {
-                        // To improve. At the moment, trick to avoid double sending
-                        this.options.onBackgroundAjaxFetchFailure(error);
-                    }
-                    throw error;
+                this.addOnGoingAjaxRequest(requestInternal, fetchPromise);
+                return fetchPromise;
+            } else {
+                // Already on-going fetching, return the response promise from previous request.
+                this.logInfo({
+                    id: requestInternal.id,
+                    url: requestInternal.request.url!,
+                    source: DataSource.HttpRequest,
+                    action: DataAction.WaitingOnGoingRequest,
+                    performanceInsight: this.getPerformanceInsight(requestInternal.id),
+                    dataSignature: undefined,
+                    fetchType: requestInternal.fetchType,
+                    httpMethod: requestInternal.httpMethod,
+                    dataAgeMs: undefined,
                 });
+                return cacheOnGoingEntry.promise;
+            }
         } else {
             return {
                 source: source, // This might be from the persistent storage as well
@@ -1382,7 +1405,7 @@ export class DataAccessSingleton implements IDataAccessSingleton {
 
     public addOnGoingAjaxRequest<T>(
         requestInternal: AjaxRequestInternal,
-        promiseAjaxResponse: Promise<AxiosResponse<T>>
+        promiseAjaxResponse: Promise<T>
     ): void {
         this.logInfo({
             id: requestInternal.id,

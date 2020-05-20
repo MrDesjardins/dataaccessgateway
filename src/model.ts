@@ -77,9 +77,9 @@ export interface CacheDataWithId<T> extends CachedData<T> {
     id: string;
     url: string; // Only used to help debugging
 }
-export interface OnGoingAjaxRequest {
+export interface OnGoingAjaxRequest<T = any> {
     ajaxRequest: AjaxRequestInternal;
-    promise: Promise<any>;
+    promise: Promise<T>;
 }
 
 export interface PerformanceTimeMarker {
