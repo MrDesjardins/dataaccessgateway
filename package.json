@@ -37,7 +37,7 @@
     "dependencies": {},
     "peerDependencies": {
         "axios": "0.19.2",
-        "dexie": "^2.0.3"
+        "dexie": "^3.2.2"
     },
     "devDependencies": {
         "@types/chrome": "0.0.74",
@@ -47,7 +47,7 @@
         "axios": "^0.19.2",
         "clean-webpack-plugin": "^0.1.19",
         "coveralls": "^3.0.11",
-        "dexie": "^2.0.3",
+        "dexie": "^3.2.2",
         "jest": "^25.2.7",
         "jest-cli": "^25.2.7",
         "source-map-explorer": "^1.8.0",
